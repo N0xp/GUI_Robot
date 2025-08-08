@@ -17,3 +17,4 @@ void coord_rotation( double &x, double &y, double ang );
 double Quotient_Remainder( double x, double y );
 double sharp_function( double reading );
 double close_angle( double ang );
+float straight_ang( float angle );

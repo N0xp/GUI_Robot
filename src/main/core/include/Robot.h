@@ -34,7 +34,7 @@ inline Sensor sensor( &hard );
 inline Movement movement( &hard, &sensor );
 inline Lidar lidar( &movement, &sensor );
 inline Oms oms( &hard );
-inline Camera cam( &movement );
+inline Camera cam( &movement, &oms, &hard );
 
 static double SL(){
   return lidar.GetLidarLeft() * 100 + offset_side;
@@ -53,19 +53,22 @@ static double setAngle(){
   return sensor.setAngle(ang);
 }
 
-
+static void set_gripper( int ang ){
+  oms.set_gripper( ang );
+}
 static void set_base( float ang ){
   oms.set_base( ang );
+}
+static void set_arm( float ang ){
+  oms.set_arm( ang );
 }
 static void reset_height( int direction ){
   oms.reset(direction);
 }
 static void oms_driver( float height ){
-  oms.oms_driver( height );
+  oms.oms_driver( height, 0 );
 }
-static void set_gripper( int ang ){
-  oms.set_gripper( ang + 150 );
-}
+
 
 
 static bool get_stop_button(){
@@ -105,6 +108,6 @@ static void line_align( std::string direction ){
 
 static void DetectFruit( std::vector<std::string> fruits ){
   bool debug = false;
-  double ang = sensor.straight_ang( movement.get_th() );
+  double ang = straight_ang( movement.get_th() );
   cam.DetectFruit( fruits, ang, debug );
 }

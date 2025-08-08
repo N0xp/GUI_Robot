@@ -21,6 +21,7 @@
 
 int Inspection();
 int SimpleTask();
+int Navigation();
 
 const float offset_front = 17.5;
 const float offset_side = 0;
