@@ -16,7 +16,6 @@ class Sensor
         double GetRightSharp();
         double GetLeftSharp();
 
-        float straight_ang( float angle );
         float sensor_mean( double & sensor_dist, int samples );
 
         float get_angle_wall( int sample );

@@ -15,7 +15,7 @@ void Lidar::StartLidar()
     lidar_mean( front_scan, front_ang );
 
     for( int i = 0; i < 360; i++){
-        std::cout << "angle: " << i << " dist: " <<  scanData.distance[i] << std::endl;
+        std::cout << "angle: " << scanData.angle[i] << " dist: " <<  scanData.distance[i] << std::endl;
     }
 
 }
@@ -47,6 +47,9 @@ void Lidar::Periodic()
     front_scan = scanData.distance[front_ang] / 1000.0;
 }
 
+studica::Lidar::ScanData Lidar::getScan(){
+    return lidar.GetData();
+}
 
 
 void Lidar::linear_align( float dist, std::string direction ){
@@ -68,7 +71,7 @@ void Lidar::linear_align( float dist, std::string direction ){
     float prev_speed = 0;
 
     
-    int des_ang = sensor->straight_ang( move->get_th() );
+    int des_ang = straight_ang( move->get_th() );
 
 
     if(       direction.compare( "front" ) == 0 ){

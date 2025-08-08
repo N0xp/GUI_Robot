@@ -26,6 +26,9 @@ class Lidar
         double GetLidarLeft( );
         double GetLidarRight( );
 
+        studica::Lidar::ScanData getScan();
+
+
     private:
         Movement * move;
         Sensor * sensor;

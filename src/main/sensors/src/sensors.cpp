@@ -18,20 +18,7 @@ void Sensor::Periodic(){
 
 }
 
-float Sensor::straight_ang( float angle ){
-    double angle_wall = 0;
-    const float split = 45;
 
-    double minDiff = 0;
-    for (int i = 0; i < (360.0 / split) + 1; i++){
-        double diff = std::abs(angle - (i * split));
-        if (i == 0 || ( diff < minDiff)){
-            angle_wall = i * split;
-            minDiff = diff;
-        }
-    }
-    return angle_wall;
-}
 
 double Sensor::GetRightSharp(){
     return sensor_mean( sharp_right_dist, 10 );
