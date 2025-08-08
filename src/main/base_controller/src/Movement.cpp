@@ -164,16 +164,20 @@ void Movement::cmd_drive( float x, float y, float th ){
     frc::SmartDashboard::PutNumber("vl", vl );
     frc::SmartDashboard::PutNumber("vr", vr );
 
+
+
     if( hardware->GetStopButton() ){  // Stop the Motors when the Stop Button is pressed
         hardware->SetLeft ( 0 );
         hardware->SetRight( 0 );
         pid_l.Reset();
         pid_r.Reset();
+        hardware->StopActuators();
     }else{
         if( desired_left_speed == 0 ){ hardware->SetLeft ( 0 );  pid_l.Reset();
         }else{ hardware->SetLeft ( std::clamp(vl, -1.0, 1.0) ); }
         if( desired_right_speed == 0 ){ hardware->SetRight( 0 ); pid_r.Reset();
         }else{ hardware->SetRight( std::clamp(vr, -1.0, 1.0) ); }
+        hardware->ReactivateActuators();
     }
 
     ShuffleBoardUpdate();
@@ -322,7 +326,7 @@ void Movement::line_align( std::string direction ){
         cobra_cl = sensor->cobra_cl;
         cobra_cr = sensor->cobra_cr;
 
-        float des_ang = sensor->straight_ang( get_th() );
+        float des_ang = straight_ang( get_th() );
         float th_diff = des_ang - get_th();
 
         if      ( th_diff < -180 ) { th_diff = th_diff + 360; }
