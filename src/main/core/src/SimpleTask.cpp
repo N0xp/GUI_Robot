@@ -9,6 +9,7 @@
 *************************************/
 
 #include "Robot.h"
+#include "procedures.h"
 
 int SimpleTask() { 
 
@@ -16,29 +17,40 @@ int SimpleTask() {
     Robot r;
     r.ds.Enable();
 
-    // lidar.StartLidar();
+    lidar.StartLidar();
     cam.StartCamera();
 
     delay(500);
 
     reset_height( 1 );
-    set_base( -180 );
+    // set_base( -180 );
+    set_arm( 300 );
 
-    set_position( 30, 30, 270 );
 
-    position_driver(  30, 370,  -1, true );
-    position_driver( 370, 370,  -1, true );
+    // set_position( 30, 30, 270 );
+
+    // position_driver(  30, 370,  -1, true );
+    // position_driver( 370, 370,  -1, true );
+    // position_driver( 370, 230, 180, true );
+
+    set_position( 370, 230, 180 );
+
+    std::vector<std::string> fruits = {"grape_purple"};
+
+    take_fruit( fruits, "right" );
+    store_fruit();
+    // take_fruit( fruits, "right" );
+    // store_fruit();
+
+    position_driver( 160, 230, 180, true );
+    
+    fruits = {"grape_purple"};
+
+    take_fruit( fruits, "front" );
+    linear_increment( 30, "back" );
+    store_fruit();
+
     position_driver( 370, 230, 180, true );
-    // position_driver( 0,     0,  90, true );
-    // position_driver( 0,     0,   0, true );
-
-    set_base( -90 );
-    oms_driver( 50 );
-
-
-
-    std::vector<std::string> fruits = {"banana", "grape_purple"};
-    DetectFruit( fruits );
 
     start_button();
 
