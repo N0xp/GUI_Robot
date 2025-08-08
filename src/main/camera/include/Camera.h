@@ -12,6 +12,7 @@
 #include <chrono>
 
 #include "Movement.h"
+#include "Oms.h"
 
 using namespace cv;
 using namespace std;
@@ -32,23 +33,26 @@ struct Object {
 
 class Camera{
     public:
-        Camera( Movement * m ) : move{m}{}
+        Camera( Movement * m, Oms * o, Hardware * h ) : move{m}, oms{o}, hard{h}{}
         void StartCamera();
         void DetectFruit( vector<string> obj_names, double angle, bool debug );
 
     private:
         Movement * move;
+        Hardware * hard;
+        Oms * oms;
 
         double x, y, th;
-        bool limit_switch;
+        bool limit_switch_low, limit_switch_high;
 
         const vector<Object> objects = {
-            {"grape_yellow", {16,25,25}, {27,255,255}, {}, {}, 2, 2, 500, 25000, 20000, false},
-            {"grape_green",  {30,25,25}, {69,255,255}, {}, {}, 2, 1, 500, 25000, 20000, false},
-            {"grape_purple", {0,25,0},   {10,255,100}, {170,25,0}, {180,255,100}, 2, 3, 500, 25000, 12000, true},
-            {"banana",       {20,100,100},{40,255,255}, {}, {}, 2, 2, 500, 25000, 19500, false},
-            {"lemon",        {40,100,0}, {75,255,100}, {}, {}, 2, 2, 500, 20000, 19500, false},
-            {"basket_stand", {20,100,100},{40,255,255}, {}, {}, 2, 2, 500, 25000, 19500, false}
+            {"grape_yellow", {16,25,25}, {27,255,255}, {}, {}, 2, 2, 1000, 25000, 8000, false},
+            {"grape_green",  {30,25,25}, {69,255,255}, {}, {}, 2, 1, 1000, 25000, 8000, false},
+            {"grape_purple", {0,50,0},   {10,255,100}, {165,25,0}, {180,255,100}, 2, 3, 500, 15000, 8500, true},
+            {"banana",       {20,100,100},{40,255,255}, {}, {}, 2, 2, 1000, 25000, 8000, false},
+            {"lemon",        {40,100,0}, {75,255,100}, {}, {}, 2, 2, 1000, 20000, 8000, false},
+            {"apple_yellow", {16,25,25}, {27,255,255}, {}, {}, 2, 2, 1000, 25000, 13000, false},
+            {"basket_stand", {20,100,100},{40,255,255}, {}, {}, 2, 2, 1000, 25000, 8000, false}
         };
     
 };
