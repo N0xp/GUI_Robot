@@ -21,8 +21,10 @@
 
 int Inspection();
 int SimpleTask();
+int Navigation();
+int MainTask();
 
-const float offset_front = 17.5;
+const float offset_front = 15;
 const float offset_side = 0;
 
 static float robot_x, robot_y, robot_th;
