@@ -35,14 +35,20 @@ int Inspection() {
     Robot r;
     r.ds.Enable();
 
-    // lidar.StartLidar();
+    lidar.StartLidar();
+    cam.StartCamera();
 
 
-    frc::SmartDashboard::PutNumber("Servo Gripper", 0 );
-    frc::SmartDashboard::PutNumber("Servo Base", 0 );
+
+    frc::SmartDashboard::PutNumber("Servo Gripper", -1 );
+    frc::SmartDashboard::PutNumber("Servo Base", -1 );
+    frc::SmartDashboard::PutNumber("Servo Arm", -1 );
+
 
     int servo_grip_ang = -1;
     int servo_base_ang = -1;
+    int servo_arm_ang  = -1;
+
 
     frc::SmartDashboard::PutNumber("Motor Left", 0 );
     frc::SmartDashboard::PutNumber("Motor Right", 0 );
@@ -62,6 +68,8 @@ int Inspection() {
 
 
     while( !STOP ){
+
+        lidar.Periodic();
 
         /******* Sharp Sensor *******/
         frc::SmartDashboard::PutNumber("Analog Right [cm]", hard.GetRightSharp() );
@@ -89,11 +97,19 @@ int Inspection() {
         frc::SmartDashboard::PutNumber("Yaw",  hard.GetYaw() );
 
         /******* Servo *******/
-        servo_base_ang = frc::SmartDashboard::GetNumber("Servo Base", -1 );
         servo_grip_ang = frc::SmartDashboard::GetNumber("Servo Gripper", -1 );
+        servo_base_ang = frc::SmartDashboard::GetNumber("Servo Base", -1 );
+        servo_arm_ang  = frc::SmartDashboard::GetNumber("Servo Arm", -1 );
 
-        hard.SetGripper( servo_grip_ang );
-        hard.SetBase   ( servo_base_ang );
+        if( servo_base_ang != -1 && !hard.GetStopButton() ){ hard.SetBase( servo_base_ang );
+        }else{ hard.SetBaseOff( ); }
+
+        if( servo_grip_ang != -1 && !hard.GetStopButton() ){ hard.SetGripper( servo_grip_ang );
+        }else{ hard.SetGripperOff( ); }
+
+        if( servo_arm_ang != -1 && !hard.GetStopButton() ) { hard.SetArm( servo_arm_ang );
+        }else{ hard.SetArmOff( ); }
+
 
         /******* Motor *******/
         ml = frc::SmartDashboard::GetNumber("Motor Left", 0 );
@@ -108,14 +124,14 @@ int Inspection() {
         hard.SetBack( mb );
         hard.SetElevator( me );        
 
-        std::cout << "************* INSPECTION *************" << std::endl;
+        // std::cout << "************* INSPECTION *************" << std::endl;
 
 
 
         STOP = frc::SmartDashboard::GetBoolean("Stop", false );
 
 
-        delay(250);
+        delay(750);
     }
 
     // lidar.StopLidar(); 

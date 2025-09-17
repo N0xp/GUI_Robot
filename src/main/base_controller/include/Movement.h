@@ -34,7 +34,7 @@ class Movement
         void InverseKinematics(double x, double y, double z);
         void ForwardKinematics( double vl, double vr, double vb );
         void SetPosition( double x, double y, double th );
-        void PositionDriver( double desired_x, double desired_y, double desired_th, bool forward );
+        void PositionDriver( double desired_x, double desired_y, double desired_th );
         void linear_increment( float dist, std::string direction );
         void cmd_drive( float vx, float vy, float vth );
         double WheelSpeed( int encoder, double time );     // Returns the wheel speed based on the Encoder Ticks
@@ -75,13 +75,13 @@ class Movement
         int current_enc_b ;
         int previous_enc_b;
 
-        const double max_motor_speed = 80.0;
+        const double max_motor_speed = 70.0;
 
         const double linear_tolerance  = 3.0;    // [cm]
         const double angular_tolerance = 2.0;    // [degrees]
 
         const double linear_slowdown_dist = 10;  // cm
-        const double max_linear_speed = 35.0;    // cm/s
+        const double max_linear_speed = 20.0;    // cm/s
         const double min_linear_speed =  7.5;    // cm/s
 
         const double angular_slowdown_dist = 10; // degrees

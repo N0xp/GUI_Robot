@@ -8,7 +8,7 @@ class PID{
         bool atSetpoint;
         double integrator, prevError, differentiator, prevMeasurement, output;
         double sumError;
-        double kSum = 1.0;
+        double kSum = 2.0;
 
 
         void Reset()
