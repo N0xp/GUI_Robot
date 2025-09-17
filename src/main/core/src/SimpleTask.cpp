@@ -26,7 +26,6 @@ int SimpleTask() {
     set_base( -180 );
     set_arm( 300 );
 
-    set_position( 30, 30, 270 );
 
   
     // set_position( 30, 30, 270 );
