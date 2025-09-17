@@ -43,3 +43,18 @@ double close_angle( double ang ){
 double sharp_function( double reading ){
     return std::pow(reading, -1.2045) * 27.726;
 }
+
+float straight_ang( float angle ){
+    double angle_wall = 0;
+    const float split = 90;
+
+    double minDiff = 0;
+    for (int i = 0; i < (360.0 / split) + 1; i++){
+        double diff = std::abs( close_angle( angle - (i * split)) );
+        if (i == 0 || ( diff < minDiff)){
+            angle_wall = i * split;
+            minDiff = diff;
+        }
+    }
+    return angle_wall;
+}

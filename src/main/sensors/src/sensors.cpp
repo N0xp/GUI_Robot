@@ -18,27 +18,14 @@ void Sensor::Periodic(){
 
 }
 
-float Sensor::straight_ang( float angle ){
-    double angle_wall = 0;
-    const float split = 45;
 
-    double minDiff = 0;
-    for (int i = 0; i < (360.0 / split) + 1; i++){
-        double diff = std::abs(angle - (i * split));
-        if (i == 0 || ( diff < minDiff)){
-            angle_wall = i * split;
-            minDiff = diff;
-        }
-    }
-    return angle_wall;
-}
 
 double Sensor::GetRightSharp(){
-    return sensor_mean( sharp_right_dist, 10 );
+    return sensor_mean( sharp_right_dist, 5 );
 }
 
 double Sensor::GetLeftSharp(){
-    return sensor_mean( sharp_left_dist, 10 );
+    return sensor_mean( sharp_left_dist, 5 );
 }
 
 float Sensor::sensor_mean( double & sensor_dist, int samples ){
@@ -56,7 +43,7 @@ float Sensor::sensor_mean( double & sensor_dist, int samples ){
             average += ( dist / samples);
             count++;
         }
-        delay(50);
+        delay(10);
     }
 
     return average;
@@ -65,7 +52,7 @@ float Sensor::sensor_mean( double & sensor_dist, int samples ){
 float Sensor::get_angle_wall( int sample ){
     Periodic();
 
-    float baseline_distance = 14;
+    float baseline_distance = 20;
 
     float sensor_difference = sensor_mean(sharp_right_dist, sample) - sensor_mean(sharp_left_dist, sample);
     float angle_diff = atan(sensor_difference / baseline_distance);
@@ -77,7 +64,7 @@ float Sensor::get_angle_wall( int sample ){
 float Sensor::setAngle( float angle ){
     Periodic();
 
-    double angle_diff = get_angle_wall( 10 );
+    double angle_diff = get_angle_wall( 5 );
 
     double angle_wall = 0;
 

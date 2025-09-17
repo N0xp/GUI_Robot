@@ -15,7 +15,7 @@ void Lidar::StartLidar()
     lidar_mean( front_scan, front_ang );
 
     for( int i = 0; i < 360; i++){
-        std::cout << "angle: " << i << " dist: " <<  scanData.distance[i] << std::endl;
+        std::cout << "angle: " << scanData.angle[i] << " dist: " <<  scanData.distance[i] << std::endl;
     }
 
 }
@@ -47,6 +47,9 @@ void Lidar::Periodic()
     front_scan = scanData.distance[front_ang] / 1000.0;
 }
 
+studica::Lidar::ScanData Lidar::getScan(){
+    return lidar.GetData();
+}
 
 
 void Lidar::linear_align( float dist, std::string direction ){
@@ -68,7 +71,7 @@ void Lidar::linear_align( float dist, std::string direction ){
     float prev_speed = 0;
 
     
-    int des_ang = sensor->straight_ang( move->get_th() );
+    int des_ang = straight_ang( move->get_th() );
 
 
     if(       direction.compare( "front" ) == 0 ){
@@ -115,7 +118,7 @@ void Lidar::linear_align( float dist, std::string direction ){
             sensor_dist = right_scan;
         }
 
-        double linear_dist_offset = 0.05;  // [m]
+        double linear_dist_offset = 0.20;  // [m]
         double max_linear_speed   = 15.0;  // [cm/s]
         double min_linear_speed   =  5.0;  // [cm/s]
         float linear_tolerance    = 0.03;  // [m]
@@ -137,7 +140,7 @@ void Lidar::linear_align( float dist, std::string direction ){
             count_zero = 0;
         }
 
-        if( count_zero > 5 ){
+        if( count_zero > 2 ){
             desired_v = -min_linear_speed;
         }
 
@@ -187,7 +190,7 @@ void Lidar::linear_align( float dist, std::string direction ){
 
 float Lidar::lidar_mean( double & sensor_dist, int & scan_ang ){
    
-    const int n_samples = 5;
+    const int n_samples = 3;
 
     float dist = 0;
 
@@ -228,7 +231,7 @@ float Lidar::lidar_mean( double & sensor_dist, int & scan_ang ){
             average = 0;
         }
 
-        delay( 100 );
+        delay( 50 );
     }
     dist = average;
 
