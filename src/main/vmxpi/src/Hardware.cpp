@@ -48,11 +48,37 @@ void Hardware::SetElevator( double pwm ){
 }
 
 void Hardware::SetGripper( double angle ){
+
+    if     ( angle > 300 ){ angle = 300; }
+    else if( angle < 0 )  { angle = 0; }
+
+    grip_ang = angle;
     servo_gripper.SetAngle( angle );
 }
-
+void Hardware::SetGripperOff(  ){
+    servo_gripper.SetOffline( );
+}
 void Hardware::SetBase( double angle ){
+
+    if     ( angle > 300 ){ angle = 300; }
+    else if( angle < 0 )  { angle = 0; }
+
+    base_ang = angle;
     servo_base.SetAngle( angle );
+}
+void Hardware::SetBaseOff( ){
+    servo_base.SetOffline( );
+}
+void Hardware::SetArm( double angle ){
+
+    if     ( angle > 300 ){ angle = 300; }
+    else if( angle < 0 )  { angle = 0; }
+
+    arm_ang = angle;
+    servo_arm.SetAngle( angle );
+}
+void Hardware::SetArmOff( ){
+    servo_arm.SetOffline( );
 }
 
 void Hardware::SetRunningLED(bool on)
@@ -119,4 +145,20 @@ double Hardware::GetRightSharp(){
 
 double Hardware::GetLeftSharp(){
     return sharp_function( sharp_left.GetVoltage() );
+}
+
+void Hardware::StopActuators(){
+    
+    SetElevator( 0 );
+    SetLeft ( 0 );
+    SetRight( 0 );
+    SetGripperOff( );
+    SetBaseOff( );
+    SetArmOff( );
+}
+
+void Hardware::ReactivateActuators(){
+    SetGripper( grip_ang );
+    SetBase( base_ang );
+    SetArm( arm_ang );
 }

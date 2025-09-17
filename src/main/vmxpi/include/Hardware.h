@@ -42,13 +42,21 @@ class Hardware
         void ResetYaw(void);
         void ResetEncoders(void);
         void SetGripper( double angle );
+        void SetGripperOff(  );
         void SetBase( double angle );
+        void SetBaseOff( );
+        void SetArm( double angle );
+        void SetArmOff( );
         void SetRunningLED(bool on);
         void SetStoppedLED(bool on);
         void SetLeft( double pwm );
         void SetRight( double pwm );
         void SetBack( double pwm );
         void SetElevator( double pwm );
+
+        void StopActuators();
+        void ReactivateActuators();
+
 
         bool GetStartButton();
         bool GetStopButton();
@@ -57,6 +65,10 @@ class Hardware
 
         double GetRightSharp();
         double GetLeftSharp();
+
+        int arm_ang  = 300;
+        int grip_ang = 0;
+        int base_ang = 150;
 
 
 
@@ -73,6 +85,8 @@ class Hardware
 
         studica::Servo servo_gripper{4};
         studica::Servo servo_base{5}; 
+        studica::Servo servo_arm{6}; 
+
 
         AHRS navX{frc::SPI::Port::kMXP};
 
@@ -88,6 +102,9 @@ class Hardware
 
         frc::AnalogInput sharp_right{constant::SHARP_RIGHT};
         frc::AnalogInput sharp_left {constant::SHARP_LEFT };
+
+
+
 
 };
 
