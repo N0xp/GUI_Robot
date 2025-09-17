@@ -10,7 +10,9 @@
 
 #include "Oms.h"
 
-void Oms::oms_driver( double desired_height ){
+void Oms::oms_driver( double desired_height, double speed ){
+
+    frc::SmartDashboard::PutString("Process",  "Oms Driver" );
 
     float desired_speed = 0;
 
@@ -26,9 +28,9 @@ void Oms::oms_driver( double desired_height ){
     int previous_enc = hardware->GetElevatorEncoder() * enc_prop;
 
     pid_e.Reset();
-    pid_e.SetIntegratorRange(-2.5, 2.5);
+    pid_e.SetIntegratorRange(-3.0, 3.0);
 
-    if ( desired_height <= high_height && desired_height >= low_height ){
+    if ( desired_height <= high_height && desired_height >= low_height || speed != 0 ){
         
         do{
             current_time = time.Get();
@@ -54,17 +56,24 @@ void Oms::oms_driver( double desired_height ){
 
             float elev_diff  = desired_height - height;
 
-            float max_speed = 35;          // [cm/s]
+            float max_speed = 40;          // [cm/s]
 
-            desired_speed = (elev_diff / 5) * max_speed;
+            if( desired_height == 0 ){
+                desired_speed = speed;
+            }else{
+                desired_speed = (elev_diff / 5) * max_speed;
+            }
+
             desired_speed = std::max( std::min( desired_speed, max_speed ), -1 * max_speed );
             if( abs(elev_diff) < tolerance ){ desired_speed = 0; }
 
 
             if ( hardware->GetStopButton() ){  // Stop the Motors when the Stop Button is pressed
                 hardware->SetElevator( 0 );
+                hardware->StopActuators();
                 pid_e.Reset();
             }else{
+                hardware->ReactivateActuators();
                 hardware->SetElevator( std::clamp(pid_e.Calculate(elevatorVelocity / 60.0, desired_speed / 60.0),  -0.75, 0.75) );
             }
             
@@ -75,30 +84,35 @@ void Oms::oms_driver( double desired_height ){
 
             delay( 40 );
 
-        }while( desired_speed != 0 );
+        }while( desired_speed != 0 && speed == 0 );
 
     }else{
         printf( "Desired Position out of the range %f to %f", low_height, high_height );
     }
 
-    hardware->SetElevator( 0 );
-    delay(150);
+    if( speed == 0 ){
+        hardware->SetElevator( 0 );
+        delay(150);
+    }
+
  
 }
 
 void Oms::reset( int direction ){
+
+    frc::SmartDashboard::PutString("Process",  "Oms Reset" );
     
     if( direction == 1 ){
         while( hardware->GetLimitHigh() ){ 
-            if( hardware->GetStopButton() ){ hardware->SetElevator( 0.0 ); }
-            else{ hardware->SetElevator( 0.4 ); }
+            if( hardware->GetStopButton() ){ hardware->SetElevator( 0.0 ); hardware->StopActuators(); }
+            else{ hardware->SetElevator( 0.4 ); hardware->ReactivateActuators(); }
             delay(50); 
         }
         height = high_height;
     }else if (direction == -1){
         while( hardware->GetLimitLow() ) { 
-            if( hardware->GetStopButton() ){ hardware->SetElevator( 0.0 ); }
-            else{ hardware->SetElevator( -0.4 ); }
+            if( hardware->GetStopButton() ){ hardware->SetElevator( 0.0 ); hardware->StopActuators(); }
+            else{ hardware->SetElevator( -0.4 ); hardware->ReactivateActuators(); }
             delay(50); }
         height = low_height;
     }
@@ -106,6 +120,8 @@ void Oms::reset( int direction ){
     hardware->SetElevator( 0 );
 
     printf("new height is %f", height);
+    frc::SmartDashboard::PutNumber("height",  height );
+
 
     delay(150);
 
@@ -117,19 +133,39 @@ void Oms::set_gripper( int ang ){
 
 void Oms::set_base( int ang ){
 
-    float angle = ang + 240;
+    base = ang;
 
-    float increment = 4;
+    float angle = ang + base_ang_offset;
 
-    for ( int i = 0; i <= abs( angle - prev_base_ang ) / increment; i++ ){
-        if( angle > prev_base_ang){
-            ang = prev_base_ang + (i * increment);
+    float increment = 2;
+
+    for ( int i = 0; i <= abs( angle - hardware->base_ang ) / increment; i++ ){
+        if( angle > hardware->base_ang){
+            ang = hardware->base_ang + (i * increment);
         }else{
-            ang = prev_base_ang - (i * increment);
+            ang = hardware->base_ang - (i * increment);
         }
         hardware->SetBase( ang );
         delay( 50 );
     }
+    hardware->SetBase( angle );
+}
 
-    prev_base_ang = angle;
+void Oms::set_arm( int ang ){
+
+    float angle = ang + 0;
+
+    float increment = 2;
+
+    for ( int i = 0; i <= abs( angle - hardware->arm_ang ) / increment; i++ ){
+        if( angle > hardware->arm_ang){
+            ang = hardware->arm_ang + (i * increment);
+        }else{
+            ang = hardware->arm_ang - (i * increment);
+        }
+        hardware->SetArm( ang );
+        delay( 50 );
+    }
+    hardware->SetArm( angle );
+
 }

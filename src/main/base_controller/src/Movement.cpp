@@ -10,7 +10,7 @@
 
 #include "Movement.h"
 
-void Movement::PositionDriver( double desired_x, double desired_y, double desired_th, bool forward ) {
+void Movement::PositionDriver( double desired_x, double desired_y, double desired_th ) {
 
 
     const float period = 20;  // ms
@@ -27,6 +27,8 @@ void Movement::PositionDriver( double desired_x, double desired_y, double desire
 
     pid_l.Reset();
     pid_r.Reset();
+
+    bool forward = true;
 
     while(true){
         
@@ -164,16 +166,20 @@ void Movement::cmd_drive( float x, float y, float th ){
     frc::SmartDashboard::PutNumber("vl", vl );
     frc::SmartDashboard::PutNumber("vr", vr );
 
+
+
     if( hardware->GetStopButton() ){  // Stop the Motors when the Stop Button is pressed
         hardware->SetLeft ( 0 );
         hardware->SetRight( 0 );
         pid_l.Reset();
         pid_r.Reset();
+        hardware->StopActuators();
     }else{
         if( desired_left_speed == 0 ){ hardware->SetLeft ( 0 );  pid_l.Reset();
         }else{ hardware->SetLeft ( std::clamp(vl, -1.0, 1.0) ); }
         if( desired_right_speed == 0 ){ hardware->SetRight( 0 ); pid_r.Reset();
         }else{ hardware->SetRight( std::clamp(vr, -1.0, 1.0) ); }
+        hardware->ReactivateActuators();
     }
 
     ShuffleBoardUpdate();
@@ -196,7 +202,7 @@ void Movement::linear_increment( float dist, std::string direction ){
 
     std::cout << "Linear Increment Goal x: " << dx << " y: " << dy << std::endl;
 
-    PositionDriver( dx, dy, get_th(), !(direction.compare( "back"  ) == 0) );
+    PositionDriver( dx, dy, get_th() );
 
 }
 
@@ -277,7 +283,7 @@ void Movement::angular_align(){
 
     Twist cmd;
 
-    while( count < 5 ){
+    while( count < 3 ){
 
         sensor->Periodic();
 
@@ -285,8 +291,8 @@ void Movement::angular_align(){
 
         double dist_offset = 5;    // [degrees]
         double max_speed   = 0.75;   // [rad/s]
-        double min_ang_speed = 0.35;     // [rad/s] 
-        float tolerance    = 6;     // [degrees]
+        double min_ang_speed = 0.4;     // [rad/s] 
+        float tolerance    = 3;     // [degrees]
  
         double desired_v = ( th_diff / dist_offset) * max_speed;
         desired_v =  std::max( std::min( desired_v, max_speed ), -1 * max_speed );
@@ -308,6 +314,8 @@ void Movement::angular_align(){
 
 void Movement::line_align( std::string direction ){
 
+    frc::SmartDashboard::PutString("Process",  "Cobra Align" );
+
     bool cobra_l  = false;
     bool cobra_r  = false;
     bool cobra_cl = false;
@@ -322,7 +330,7 @@ void Movement::line_align( std::string direction ){
         cobra_cl = sensor->cobra_cl;
         cobra_cr = sensor->cobra_cr;
 
-        float des_ang = sensor->straight_ang( get_th() );
+        float des_ang = straight_ang( get_th() );
         float th_diff = des_ang - get_th();
 
         if      ( th_diff < -180 ) { th_diff = th_diff + 360; }
