@@ -44,42 +44,39 @@ static void dfs( Coord * d, Coord * c, vector<Coord> path, double dist, vector<v
         
         bool reached = false;
 
+        // Check if the neighbors of the desired point are the current point
         for( Coord * n_d : d->neighbor ){
             if( n->name == n_d->name ){ reached = true; }
         }
-
+        // Check if the neighbors of the point being analyzed are the desired point
         for( Coord * n_c : n->neighbor ){
             if( d->name == n_c->name ){ reached = true; }
         }
-
-        // for( Coord p : path ){
-        //     cout << p.name << " " ;
-        // }
-        // cout << n->name << " " ;
-        // cout << d->name << " " ;
-
-        // cout << dist << endl;
+        // Check if the point being analyzed is the desired point
+        if( n->name == d->name ){ reached = true; }
 
 
         if( reached ){
-            path.push_back( *n );
 
             double mag_f = sqrt( pow( d->pos[0] - n->pos[0], 2 ) + pow( d->pos[1] - n->pos[1], 2 ) );
             for( Coord p : path ){
-                // cout << p.name << " " ;
+                cout << p.name << " " ;
             }
-            dist = dist + mag + mag_f;
-            dist = dist + path.size();
-            // cout << dist << endl;
+            cout << n->name << " " ;
+            cout << d->name << " " ;
 
-            if( dist < d_dist || d_dist <= 0 ){
+            double t_dist = local_dist + mag_f + path.size() + 2;
+            cout << t_dist << endl;
+
+            if( t_dist < d_dist || d_dist <= 0 ){
                 d_path.clear();
                 for( Coord p : path ){ 
                     d_path.push_back( p.pos ); 
                 }
+                d_path.push_back( n->pos ); 
                 d_path.push_back( d->pos ); 
                 
-                d_dist = dist;
+                d_dist = t_dist;
             }
 
             continue;
