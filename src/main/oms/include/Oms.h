@@ -44,7 +44,7 @@ class Oms
         float height = 1000;         // OMS height [cm]
         float base = 0;
 
-        const int base_ang_offset = 240;
+        static constexpr int base_ang_offset = 240;
 
     private:
 
@@ -62,11 +62,11 @@ class Oms
 
         int elevator_enc;
 
-        const float pinionRadius = 1.25;   // Pinion's radius [cm]
+        static constexpr float pinionRadius = 1.25;   // Pinion's radius [cm]
 
-        const double kP = 0.9;
-        const double kI = 0.3;
-        const double kD = 0;
+        static constexpr double kP = 0.9;
+        static constexpr double kI = 0.3;
+        static constexpr double kD = 0;
 
         frc2::PIDController pid_e{kP, kI, kD};
 

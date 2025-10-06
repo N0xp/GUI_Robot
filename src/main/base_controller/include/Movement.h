@@ -75,18 +75,18 @@ class Movement
         int current_enc_b ;
         int previous_enc_b;
 
-        const double max_motor_speed = 70.0;
+        static constexpr double max_motor_speed = 70.0;
 
-        const double linear_tolerance  = 3.0;    // [cm]
-        const double angular_tolerance = 2.0;    // [degrees]
+        static constexpr double linear_tolerance  = 3.0;    // [cm]
+        static constexpr double angular_tolerance = 2.0;    // [degrees]
 
-        const double linear_slowdown_dist = 10;  // cm
-        const double max_linear_speed = 20.0;    // cm/s
-        const double min_linear_speed =  7.5;    // cm/s
+        static constexpr double linear_slowdown_dist = 10;  // cm
+        static constexpr double max_linear_speed = 20.0;    // cm/s
+        static constexpr double min_linear_speed =  7.5;    // cm/s
 
-        const double angular_slowdown_dist = 10; // degrees
-        const double max_ang_speed = 1.5;        // rad/s
-        const double min_ang_speed = 0.2;        // rad/s
+        static constexpr double angular_slowdown_dist = 10; // degrees
+        static constexpr double max_ang_speed = 1.5;        // rad/s
+        static constexpr double min_ang_speed = 0.2;        // rad/s
 
         double leftVelocity;
         double rightVelocity;
@@ -102,9 +102,9 @@ class Movement
 
         double offset_th;
 
-        const double kP = 0.8;
-        const double kI = 0.05;
-        const double kD = 0.0;
+        static constexpr double kP = 0.8;
+        static constexpr double kI = 0.05;
+        static constexpr double kD = 0.0;
 
         PID pid_l;
         PID pid_r;
