@@ -15,6 +15,10 @@ class Sensor
 
         double GetRightSharp();
         double GetLeftSharp();
+        double GetArmSharp();
+
+        double GetRightUS();
+        double GetLeftUS();
 
         float sensor_mean( double & sensor_dist, int samples );
 
@@ -30,8 +34,10 @@ class Sensor
         Hardware * hardware;
 
         double sharp_right_dist = 0;
-        double sharp_left_dist = 0;
+        double sharp_left_dist  = 0;
+        double sharp_arm_dist   = 0;
 
-
+        double us_right_dist = 0;
+        double us_left_dist  = 0;
 
 };

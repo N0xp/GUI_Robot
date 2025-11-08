@@ -2,9 +2,10 @@
 
 int main(){
 
-    // Inspection();
+    Inspection();
+    
     // SimpleTask();
-    MainTask();
+    // MainTask();
     // Navigation();
 
 

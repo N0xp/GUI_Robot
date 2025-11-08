@@ -21,11 +21,14 @@
 
 int Inspection();
 int SimpleTask();
-int Navigation();
+// int Navigation();
 int MainTask();
+int PathPlannerTest();
 
 const float offset_front = 15;
-const float offset_side = 0;
+const float offset_side  = 0;
+const float offset_back  = 15;
+
 
 static float robot_x, robot_y, robot_th;
 

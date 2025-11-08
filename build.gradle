@@ -59,11 +59,11 @@ model {
 
             sources.cpp {
                 source {
-                    srcDirs 'src/main/core', 'src/main/base_controller', 'src/main/vmxpi', 'src/main/sensors', 'src/main/oms', 'src/main/camera'
+                    srcDirs 'src/main/core', 'src/main/base_controller', 'src/main/vmxpi', 'src/main/sensors', 'src/main/oms', 'src/main/camera', 'src/main/teleop', 'src/main/pathplanner'
                     include '**/*.cpp', '**/*.cc'
                 }
                 exportedHeaders {
-                    srcDirs 'src/main/core/include', 'src/main/base_controller/include', 'src/main/vmxpi/include', 'src/main/sensors/include', 'src/main/oms/include', 'src/main/camera/include'
+                    srcDirs 'src/main/core/include', 'src/main/base_controller/include', 'src/main/vmxpi/include', 'src/main/sensors/include', 'src/main/oms/include', 'src/main/camera/include', 'src/main/teleop/include', 'src/main/pathplanner/include'
                     include '**/*.h'
 
                     // srcDir 'src/main/include'

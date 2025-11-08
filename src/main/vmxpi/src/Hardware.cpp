@@ -140,11 +140,31 @@ double Hardware::GetCobra( int channel ){
 }
 
 double Hardware::GetRightSharp(){
-    return sharp_function( sharp_right.GetVoltage() );
+    return sharp_function_right( sharp_right.GetVoltage() );
+}
+double Hardware::GetRightSharpVoltage(){
+    return sharp_right.GetVoltage();
+}
+double Hardware::GetLeftSharp(){
+    return sharp_function_left( sharp_left.GetVoltage() );
+}
+double Hardware::GetLeftSharpVoltage(){
+    return sharp_left.GetVoltage();
+}
+double Hardware::GetArmSharp(){
+    return sharp_function_left( sharp_arm.GetVoltage() );
+}
+double Hardware::GetArmSharpVoltage(){
+    return sharp_arm.GetVoltage();
 }
 
-double Hardware::GetLeftSharp(){
-    return sharp_function( sharp_left.GetVoltage() );
+double Hardware::GetRightUS(){
+    us_r.Ping();
+    return us_r.GetRangeMM() / 10.0;
+}
+double Hardware::GetLeftUS(){
+    us_l.Ping();
+    return us_l.GetRangeMM() / 10.0;
 }
 
 void Hardware::StopActuators(){

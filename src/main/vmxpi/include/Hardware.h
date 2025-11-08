@@ -14,7 +14,7 @@
 #include <frc/DigitalInput.h>
 #include <frc/DigitalOutput.h>
 #include <frc/AnalogInput.h>
-
+#include <frc/Ultrasonic.h>
 
 #include "studica/TitanQuad.h"
 #include "studica/TitanQuadEncoder.h"
@@ -65,6 +65,16 @@ class Hardware
 
         double GetRightSharp();
         double GetLeftSharp();
+        double GetArmSharp();
+
+        double GetRightSharpVoltage();
+        double GetLeftSharpVoltage();
+        double GetArmSharpVoltage();
+
+        double GetRightUS();
+        double GetLeftUS();
+
+
 
         int arm_ang  = 300;
         int grip_ang = 0;
@@ -102,6 +112,10 @@ class Hardware
 
         frc::AnalogInput sharp_right{constant::SHARP_RIGHT};
         frc::AnalogInput sharp_left {constant::SHARP_LEFT };
+        frc::AnalogInput sharp_arm  {constant::SHARP_ARM  };
+
+        frc::Ultrasonic us_l{ constant::US_LEFT_TRIG,  constant::US_LEFT_ECHO  };
+        frc::Ultrasonic us_r{ constant::US_RIGHT_TRIG, constant::US_RIGHT_ECHO }; 
 
 
 

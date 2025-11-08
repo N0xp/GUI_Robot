@@ -1,0 +1,2 @@
+set(__QT_DEPLOY_TARGET_RobotPathPlanner_FILE /Users/ymz/Desktop/UAE-Cpp/RobotPathPlanner/build/RobotPathPlanner.app/Contents/MacOS/RobotPathPlanner)
+set(__QT_DEPLOY_TARGET_RobotPathPlanner_TYPE EXECUTABLE)

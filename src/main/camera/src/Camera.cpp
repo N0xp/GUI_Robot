@@ -7,8 +7,8 @@ void Camera::StartCamera(){
     frc::Shuffleboard::GetTab("MainData").Add("Camera", mainCamera).WithPosition(0, 0).WithSize(10, 5);
 }
 
-void Camera::DetectFruit( vector<string> obj_names, double angle, bool debug ){
-
+void Camera::DetectFruit( vector<string> obj_names, double angle, bool debug, bool use_area ){
+    
     frc::SmartDashboard::PutString("Process",  "Fruit Detection" );
 
     cs::CvSink cvSink = frc::CameraServer::GetInstance()->GetVideo();
@@ -100,16 +100,29 @@ void Camera::DetectFruit( vector<string> obj_names, double angle, bool debug ){
 
 
         double vel_x = 0, vel_y = 0, vel_z = 0, vth = 0;
-        double max_vel_x = 10, max_vel_y = 30, max_vel_z = 30, max_angular_speed = 0.75;
+        double max_vel_x = 10, max_vel_y = 30, max_vel_z = 35, max_angular_speed = 0.75;
+
 
         double vx = max_vel_x * fabs(obj_x - offset_x) / 40.0;
         vx = min(vx, max_vel_x);
 
-        double vy = max_vel_y * fabs(max_area - des_area) / 2000.0;
-        vy = min(vy, max_vel_y);
-
-        double vz = max_vel_z * fabs(obj_y - offset_y) / 30.0;
+        double vz = max_vel_z * fabs(obj_y - offset_y) / 25.0;
         vz = min(vz, max_vel_z);
+
+        double dist_arm = hard->GetArmSharp();
+        double desired_arm_dist = 12;
+
+        double vy = max_vel_y * fabs(dist_arm - desired_arm_dist) / 5.0;
+        vy = min(vy, max_vel_y);
+        
+        double y_unit = dist_arm;
+
+        if( use_area ){
+            double vy = max_vel_y * fabs(max_area - des_area) / 2000.0;
+            vy = min(vy, max_vel_y);
+            y_unit = max_area;
+        }
+
 
         if( abs(obj_x -offset_x ) < 15){ find_obj = true; }
 
@@ -121,10 +134,14 @@ void Camera::DetectFruit( vector<string> obj_names, double angle, bool debug ){
             vel_z = -vz;}
         else if ((obj_y < offset_y - 20 && find_obj )){ //|| (obj_y > offset_y + 15 && abs(max_area - des_area) < 500)) && limit_switch_low) {
             vel_z = vz; }
-        else if   (max_area > des_area + 500 && find_obj) {
+        else if   (max_area > des_area + 500 && find_obj && use_area ) {
             vel_y = vy; }
-        else if (max_area < des_area - 500 && find_obj) {
+        else if (max_area < des_area - 500 && find_obj && use_area ) {
             vel_y = -vy; }
+        else if (dist_arm > desired_arm_dist + 1 && find_obj && !use_area ) {
+            vel_y = -vy; }
+        else if (dist_arm < desired_arm_dist - 1 && find_obj && !use_area ) {
+            vel_y = vy; }
 
         double th_diff = angle - move->get_th();
         if (th_diff > 180) th_diff -= 360;
@@ -176,7 +193,7 @@ void Camera::DetectFruit( vector<string> obj_names, double angle, bool debug ){
 
         drawContours(frame, contour, -1, cv::Scalar(0, 255, 0), 2);
 
-        std::string text = std::to_string( obj_x ) + ", " + std::to_string( obj_y ) + ", " + std::to_string( max_area );
+        std::string text = std::to_string( obj_x ) + ", " + std::to_string( obj_y ) + ", " + std::to_string( y_unit );
         cv::putText(frame, text, Point(obj_x, obj_y), cv::FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0,0,255), 2);
 
 
@@ -194,6 +211,10 @@ void Camera::DetectFruit( vector<string> obj_names, double angle, bool debug ){
 
         if (count > 5) {
             break;
+        }
+        
+        if( debug ){
+            // break;
         }
 
 

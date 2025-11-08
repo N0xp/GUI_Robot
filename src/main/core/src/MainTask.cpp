@@ -1,18 +1,9 @@
-/************************************
- * Author: Felipe Ferreira
- * Release version: 1.0.0.0
- * 
- * Modified by: 
- * Last modification date: 
- * New version:
 
-*************************************/
 
 #include "Robot.h"
 #include "procedures.h"
 
 int MainTask() { 
-
 
     A = { "A", {  35,  35,  -1 }, {&B, &C, &G}};
     B = { "B", {  35, 305,  -1 }, {&A, &C}    };
@@ -23,8 +14,8 @@ int MainTask() {
     G = { "G", {  35,  35, 180 }, {&A, &H}    };
     H = { "H", { 200,  35, 180 }, {&G, &F}    };
 
-    Coord take_basket_coord = { "t_b", { 40,  65, 0 }, {&F, &D, &E, &A} };
-    Coord deli_basket_coord = { "d_b", { 40, 325, 0 }, {&F, &D, &E, &C} }; 
+    Coord take_basket_coord = { "t_b", { 360,  65, 0 }, {&F, &D, &E} };
+    Coord deli_basket_coord = { "d_b", { 360, 325, 0 }, {&F, &D, &E} }; 
 
     Object obj1 = { grape_purple, {"obj1", {100, 365,   0}, {&C, &D}}};
     Object obj2 = { grape_yellow, {"obj2", {300, 365,   0}, {&C, &D}}};
@@ -37,35 +28,46 @@ int MainTask() {
     Robot r;
     r.ds.Enable();
 
-    lidar.StartLidar();
-    cam.StartCamera();
+    // lidar.StartLidar();
+    // cam.StartCamera();
 
     delay(500);
 
-    reset_height( 1 );
-    set_base( -180 );
-    set_arm( 300 );
+    // reset_height( 1 );
+    // set_base( -180 );
+    // set_arm( 300 );
 
     set_position( 30, 30, 270 );
 
-    linear_align( 12, "front" );
-    angular_align();
+    // linear_align( 12, "front" );
+    // angular_align();
 
-    robot_x = SR();                             // Left, Right or Front?
-    robot_y = SFL();                              // Left, Right or Front?
-    robot_th = setAngle();
-    set_position( robot_x, robot_y, robot_th );  
+    // robot_x = SR();                               // Left, Right or Front?
+    // robot_y = SFL();                              // Left, Right or Front?
+    // robot_th = setAngle();
+    // set_position( robot_x, robot_y, robot_th );  
 
+    Coord current_point = { "cur", {get_x(),get_y(),get_th()}, {&C} };
+    path_driver( best_way( D, current_point ) );
 
-    Coord current_point = { "cur", {get_x(),get_y(),get_th()}, {&A} };
-    path_driver( best_way( obj4.coord, current_point ) );
+    current_point = { "cur", {get_x(),get_y(),get_th()}, prev_Coord.neighbor };
+    path_driver( best_way( deli_basket_coord, current_point ) );
 
-    current_point       = { "cur", {get_x(),get_y(),get_th()}, {&E} };
-    path_driver( best_way( A, current_point ) );
+    // Coord current_point = { "cur", {get_x(),get_y(),get_th()}, {&A} };
+    // path_driver( best_way( obj1.coord, current_point ) );
+
+    // current_point = { "cur", {get_x(),get_y(),get_th()}, prev_Coord.neighbor };
+    // path_driver( best_way( obj3.coord, current_point ) );
+
+    // current_point = { "cur", {get_x(),get_y(),get_th()}, prev_Coord.neighbor };
+    // path_driver( best_way( deli_basket_coord, current_point ) );
+
+    // current_point = { "cur", {get_x(),get_y(),get_th()}, prev_Coord.neighbor };
+    // path_driver( best_way( A, current_point ) );
+
 
 
     // current_point = { "cur", {35,35,0}, {&F} };
-
     // path_driver( best_way( obj2.coord, current_point ) );
 
 

@@ -3,6 +3,10 @@
 void Sensor::Periodic(){
     sharp_right_dist = hardware->GetRightSharp();
     sharp_left_dist  = hardware->GetLeftSharp();
+    sharp_arm_dist   = hardware->GetArmSharp();
+
+    us_right_dist = hardware->GetRightUS();
+    us_left_dist  = hardware->GetLeftUS();
 
     cobra_l  = hardware->GetCobra(0) > 2.5;
     cobra_r  = hardware->GetCobra(3) > 2.5;
@@ -11,6 +15,11 @@ void Sensor::Periodic(){
 
     frc::SmartDashboard::PutNumber("sharp_right_dist", sharp_right_dist );
     frc::SmartDashboard::PutNumber("sharp_left_dist", sharp_left_dist );
+    frc::SmartDashboard::PutNumber("sharp_arm_dist", sharp_arm_dist );
+
+    frc::SmartDashboard::PutNumber("us_right_dist", us_right_dist );
+    frc::SmartDashboard::PutNumber("us_left_dist", us_left_dist );
+
     frc::SmartDashboard::PutNumber("cobra_l",  hardware->GetCobra(0) );
     frc::SmartDashboard::PutNumber("cobra_r",  hardware->GetCobra(3) );
     frc::SmartDashboard::PutNumber("cobra_cl", hardware->GetCobra(1) );
@@ -26,6 +35,16 @@ double Sensor::GetRightSharp(){
 
 double Sensor::GetLeftSharp(){
     return sensor_mean( sharp_left_dist, 5 );
+}
+
+double Sensor::GetArmSharp(){
+    return sensor_mean( sharp_arm_dist, 5 );
+}
+double Sensor::GetRightUS(){
+    return sensor_mean( us_right_dist, 5 );
+}
+double Sensor::GetLeftUS(){
+    return sensor_mean( us_left_dist, 5 );
 }
 
 float Sensor::sensor_mean( double & sensor_dist, int samples ){
@@ -54,7 +73,13 @@ float Sensor::get_angle_wall( int sample ){
 
     float baseline_distance = 20;
 
-    float sensor_difference = sensor_mean(sharp_right_dist, sample) - sensor_mean(sharp_left_dist, sample);
+    float right = sensor_mean(us_right_dist, sample);
+    float left  = sensor_mean(us_left_dist,  sample);
+
+    frc::SmartDashboard::PutNumber("right", right );
+    frc::SmartDashboard::PutNumber("left", left );
+
+    float sensor_difference = right - left;
     float angle_diff = atan(sensor_difference / baseline_distance);
     angle_diff = angle_diff * (180.0 / M_PI);
 

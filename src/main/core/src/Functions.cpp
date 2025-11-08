@@ -40,7 +40,13 @@ double close_angle( double ang ){
     return ang;
 }
 
-double sharp_function( double reading ){
+double sharp_function_left( double reading ){
+    return std::pow(reading, -1.2045) * 27.726;
+}
+double sharp_function_right( double reading ){
+    return std::pow(reading, -1.2045) * 27.726;
+}
+double sharp_function_arm( double reading ){
     return std::pow(reading, -1.2045) * 27.726;
 }
 

@@ -1,12 +1,4 @@
-/************************************
- * Author: Felipe Ferreira
- * Release version: 1.0.0.0
- * 
- * Modified by: 
- * Last modification date: 
- * New version:
 
-*************************************/
 
 #include "Robot.h"
 #include "procedures.h"
@@ -22,47 +14,56 @@ int SimpleTask() {
 
     delay(500);
 
+
+
     reset_height( 1 );
     set_base( -180 );
     set_arm( 300 );
 
 
   
-    // set_position( 30, 30, 270 );
+    set_position( 30, 30, 270 );
 
-    linear_align( 12, "front" );
-    angular_align();
+    // linear_align( 20, "back" );
+    // // angular_align();
 
-    robot_x = SR();                             // Left, Right or Front?
-    robot_y = SFL();                              // Left, Right or Front?
-    robot_th = setAngle();
-    set_position( robot_x, robot_y, robot_th );  
-
-    
-    position_driver(  30, 370,  -1 );
-    position_driver( 370, 370,  -1 );
-    position_driver( 370, 230, 180 );
-
-
-    std::vector<std::string> fruits = {"grape_purple"};
-
-    take_fruit( fruits, "right" );
-    store_fruit();
-
-    position_driver( 170, 230, 180 );
-
-    fruits = {"grape_purple"};
-
-    take_fruit( fruits, "front" );
-    linear_increment( 30, "back" );
-    store_fruit();
+    // robot_x = SR();                             // Left, Right or Front?
+    // robot_y = SBR();                              // Left, Right or Front?
+    // robot_th = setAngle();
+    // set_position( robot_x, robot_y, robot_th );  
 
     // start_button();
 
+    
+    // position_driver(  30, 370,  -1 );
+    // position_driver( 370, 370,  -1 );
+    // position_driver( 370, 230, 180 );
 
-    position_driver( 370, 230, -1 );
-    position_driver( 370,  30,  0 );
-    position_driver( 30,   30,  0 );
+    set_base( -90 );
+    set_arm( 300 );
+    oms_driver( 20 );
+
+
+    std::vector<std::string> fruits = {"grape_purple"};
+    // DetectFruitSharp( fruits );
+
+    take_fruit( fruits, "right" );
+    // store_fruit();
+
+    // position_driver( 170, 230, 180 );
+
+    // fruits = {"grape_purple"};
+
+    // take_fruit( fruits, "front" );
+    // linear_increment( 30, "back" );
+    // store_fruit();
+
+    // // start_button();
+
+
+    // position_driver( 370, 230, -1 );
+    // position_driver( 370,  30,  0 );
+    // position_driver( 30,   30,  0 );
 
 
 
@@ -178,7 +179,7 @@ int SimpleTask() {
 
 
 
-    // lidar.StopLidar(); 
+    lidar.StopLidar(); 
     r.ds.Disable();
 
     return 0; 

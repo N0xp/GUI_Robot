@@ -35,7 +35,7 @@ class Camera{
     public:
         Camera( Movement * m, Oms * o, Hardware * h ) : move{m}, oms{o}, hard{h}{}
         void StartCamera();
-        void DetectFruit( vector<string> obj_names, double angle, bool debug );
+        void DetectFruit( vector<string> obj_names, double angle, bool debug, bool use_area );
 
     private:
         Movement * move;
@@ -45,7 +45,7 @@ class Camera{
         double x, y, th;
         bool limit_switch_low, limit_switch_high;
 
-        const vector<ObjectCam> objects = {
+        vector<ObjectCam> objects = {
             {"grape_yellow", {16,25,25}, {27,255,255}, {}, {}, 2, 2, 1000, 25000, 8000, false},
             {"grape_green",  {30,25,25}, {69,255,255}, {}, {}, 2, 1, 1000, 25000, 8000, false},
             {"grape_purple", {0,50,0},   {10,255,100}, {165,25,0}, {180,255,100}, 2, 3, 500, 15000, 8500, true},

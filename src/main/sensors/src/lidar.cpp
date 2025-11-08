@@ -102,13 +102,21 @@ void Lidar::linear_align( float dist, std::string direction ){
                 move->linear_increment( 5, "left" );
             }
         }while( sensor_dist == -1 );
+    }else if( direction.compare( "back" ) == 0 ){
+        do{
+            sensor->Periodic();
+            sensor_dist = (sensor->GetRightUS() + sensor->GetLeftUS()) / 2.0;
+            if( sensor_dist < 5 ){
+                move->linear_increment( 5, "front" );
+            }
+        }while( sensor_dist < 5 );
     }
-
     Twist cmd;
 
     while( count < 5 ){
 
         Periodic();
+        sensor->Periodic();
 
         if(       direction.compare( "front" ) == 0 ){
             sensor_dist = front_scan;
@@ -116,8 +124,9 @@ void Lidar::linear_align( float dist, std::string direction ){
             sensor_dist = left_scan;
         }else if( direction.compare( "right" ) == 0 ){
             sensor_dist = right_scan;
+        }else if( direction.compare( "back" ) == 0 ){
+            sensor_dist = ((sensor->GetRightUS() + sensor->GetLeftUS()) / 2.0) / 100.0;  // [m]
         }
-
         double linear_dist_offset = 0.20;  // [m]
         double max_linear_speed   = 15.0;  // [cm/s]
         double min_linear_speed   =  5.0;  // [cm/s]
@@ -153,8 +162,10 @@ void Lidar::linear_align( float dist, std::string direction ){
         }else if( direction.compare( "right" ) == 0 ){
             cmd.linear.x = 0;
             cmd.linear.y  = -desired_v;
+        }else if( direction.compare( "back" ) == 0 ){
+            cmd.linear.x = -desired_v;
+            cmd.linear.y = 0;
         }
-
         float th_diff = des_ang - move->get_th();
 
         if      ( th_diff < -180 ) { th_diff = th_diff + 360; }

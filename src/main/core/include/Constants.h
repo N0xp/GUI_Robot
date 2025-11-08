@@ -38,6 +38,13 @@ namespace constant
 
     static constexpr int SHARP_RIGHT  =  2;
     static constexpr int SHARP_LEFT   =  3;
+    static constexpr int SHARP_ARM    =  1;
+
+    static constexpr int US_LEFT_TRIG  =  2;
+    static constexpr int US_LEFT_ECHO  =  3;
+    static constexpr int US_RIGHT_TRIG =  0;
+    static constexpr int US_RIGHT_ECHO =  1;
+
 
 
 

@@ -14,7 +14,7 @@ void take_fruit( std::vector<std::string> fruits, std::string direction ){
     set_arm( 300 );
     oms_driver( 20 );
 
-    DetectFruit( fruits );
+    DetectFruitSharp( fruits );
 
     int arm_ang = hard.arm_ang;
 

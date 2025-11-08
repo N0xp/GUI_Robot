@@ -237,6 +237,8 @@ void Movement::SetPosition( double x, double y, double th ){
   y_global  = y;
   offset_th = -hardware->GetYaw() - th;
   th_global = th;
+
+  ShuffleBoardUpdate();
 }
 
 void Movement::ShuffleBoardUpdate(){

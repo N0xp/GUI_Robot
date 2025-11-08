@@ -36,14 +36,12 @@ int Inspection() {
     r.ds.Enable();
 
     lidar.StartLidar();
-    cam.StartCamera();
 
-
+    delay(500);
 
     frc::SmartDashboard::PutNumber("Servo Gripper", -1 );
     frc::SmartDashboard::PutNumber("Servo Base", -1 );
     frc::SmartDashboard::PutNumber("Servo Arm", -1 );
-
 
     int servo_grip_ang = -1;
     int servo_base_ang = -1;
@@ -74,6 +72,16 @@ int Inspection() {
         /******* Sharp Sensor *******/
         frc::SmartDashboard::PutNumber("Analog Right [cm]", hard.GetRightSharp() );
         frc::SmartDashboard::PutNumber("Analog Left [cm]" , hard.GetLeftSharp()  );
+        frc::SmartDashboard::PutNumber("Analog Arm [cm]" ,  hard.GetArmSharp()   );
+
+        frc::SmartDashboard::PutNumber("Analog Right [V]", hard.GetRightSharpVoltage() );
+        frc::SmartDashboard::PutNumber("Analog Left [V]" , hard.GetLeftSharpVoltage()  );
+        frc::SmartDashboard::PutNumber("Analog Arm [V]" ,  hard.GetArmSharpVoltage()   );
+
+        /******* US Sensor *******/
+        frc::SmartDashboard::PutNumber("US Left [cm]" ,   hard.GetLeftUS()  );
+        frc::SmartDashboard::PutNumber("US Right [cm]" ,  hard.GetRightUS() );
+
 
         /******* Encoder *******/
         frc::SmartDashboard::PutNumber("Encoder Left",     hard.GetLeftEncoder()     );
