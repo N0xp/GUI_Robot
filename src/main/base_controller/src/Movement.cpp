@@ -9,6 +9,7 @@
 *************************************/
 
 #include "Movement.h"
+#include "Robot.h"
 
 void Movement::PositionDriver( double desired_x, double desired_y, double desired_th ) {
 
@@ -29,10 +30,17 @@ void Movement::PositionDriver( double desired_x, double desired_y, double desire
     pid_r.Reset();
 
     bool forward = true;
+    static int update_counter = 0;  // For periodic GUI updates
 
     while(true){
         
         RobotPosition();    // Calculates Robot Position based on the wheels speed and displacement
+
+        // Send position to GUI every 10 iterations (~200ms)
+        update_counter++;
+        if (update_counter % 10 == 0) {
+            pathplanner_update_odometry(false);
+        }
 
         double desired_position[3] = { desired_x, desired_y, desired_th };   // [cm], [cm], [degrees]
         double current_position[3] = { x_global , y_global, th_global };     // [cm], [cm], [degrees]

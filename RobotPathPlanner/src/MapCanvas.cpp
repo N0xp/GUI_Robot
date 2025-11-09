@@ -5,6 +5,8 @@
 #include <QContextMenuEvent>
 #include <QMenu>
 #include <QPainterPath>
+#include <QInputDialog>
+#include <QPalette>
 #include <cmath>
 #include <limits>
 
@@ -21,6 +23,18 @@ namespace {
     constexpr double DEFAULT_SCALE = 50.0;                 // 50 pixels per meter
     constexpr double MIN_SCALE = 5.0;                      // Minimum zoom level
     constexpr double MAX_SCALE = 500.0;                    // Maximum zoom level
+
+    // Dark theme palette
+    const QColor CANVAS_BG_TOP(250, 250, 252);
+    const QColor CANVAS_BG_BOTTOM(245, 245, 248);
+    const QColor PANEL_BG(22, 26, 40, 235);
+    const QColor PANEL_BORDER(104, 128, 180);
+    const QColor TEXT_PRIMARY(240, 244, 255);
+    const QColor TEXT_MUTED(180, 192, 210);
+    const QColor GRID_MAJOR_COLOR(110, 130, 170);
+    const QColor GRID_MINOR_COLOR(60, 75, 105);
+    const QColor ACCENT_ORANGE(255, 140, 70);
+    const QColor ACCENT_TEAL(0, 220, 190);
 }
 
 MapCanvas::MapCanvas(QWidget* parent)
@@ -34,8 +48,14 @@ MapCanvas::MapCanvas(QWidget* parent)
     , m_primaryRobotIndex(0)
     , m_currentTool(Tool::None)
     , m_isDrawing(false)
+    , m_waitingForSecondClick(false)
+    , m_constrainedDrawing(false)
+    , m_constrainedDistance(1.0)
+    , m_constrainedAngle(0.0)
     , m_lastDrawPoint(0, 0)
+    , m_cursorWorldPos(0, 0)
     , m_measuring(false)
+    , m_measureLocked(false)
     , m_measureSnappedToLine(false)
     , m_measureSnappedToRobot(false)
     , m_measureSnappedLineIndex(-1)
@@ -59,6 +79,9 @@ MapCanvas::MapCanvas(QWidget* parent)
     , m_selectedPathIndex(-1)
     , m_selectedWaypointIndex(-1)
     , m_isPanning(false)
+    , m_fixedSnapEnabled(true)
+    , m_fixedLengthStep(0.05)
+    , m_fixedAngleStep(5.0)
 {
     setMouseTracking(true);
     setFocusPolicy(Qt::StrongFocus);
@@ -125,6 +148,7 @@ void MapCanvas::updateRobotPose(int index, const Geometry::RobotPose& pose) {
 void MapCanvas::setTool(Tool tool) {
     m_currentTool = tool;
     m_isDrawing = false;
+    m_waitingForSecondClick = false;
     m_measuring = false;
 
     // Update cursor based on tool
@@ -226,8 +250,11 @@ void MapCanvas::paintEvent(QPaintEvent* event) {
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
 
-    // Fill background
-    painter.fillRect(rect(), QColor(240, 240, 240));
+    // Fill background with modern gradient
+    QLinearGradient gradient(0, 0, 0, height());
+    gradient.setColorAt(0, CANVAS_BG_TOP);
+    gradient.setColorAt(1, CANVAS_BG_BOTTOM);
+    painter.fillRect(rect(), gradient);
 
     // Draw grid
     if (m_showGrid) {
@@ -261,7 +288,7 @@ void MapCanvas::paintEvent(QPaintEvent* event) {
             // Draw "PRIMARY" label on main robot
             if (isPrimary && m_robots.size() > 1) {
                 QPointF robotPos = worldToScreen(m_robots[i].position);
-                painter.setPen(Qt::red);
+                painter.setPen(ACCENT_ORANGE);
                 painter.setFont(QFont("Arial", 9, QFont::Bold));
                 painter.drawText(robotPos + QPointF(-20, -25), "PRIMARY");
             }
@@ -270,7 +297,7 @@ void MapCanvas::paintEvent(QPaintEvent* event) {
 
     // Draw current drawing
     if (m_isDrawing && m_currentTool == Tool::DrawLine) {
-        painter.setPen(QPen(Qt::blue, 2, Qt::DashLine));
+        painter.setPen(QPen(QColor(120, 180, 255), 2, Qt::DashLine));
         QPointF start = worldToScreen(m_drawStartPoint);
         QPointF end = worldToScreen(m_drawCurrentPoint);
         painter.drawLine(start, end);
@@ -281,9 +308,116 @@ void MapCanvas::paintEvent(QPaintEvent* event) {
         drawAngle(painter, tempLine);
     }
 
+    // Draw snap point indicators when DrawLine tool is active
+    if (m_currentTool == Tool::DrawLine && m_snapToPoints) {
+        QVector<Geometry::Point> snapPoints = getAllSnappablePoints();
+
+        // Determine which point (if any) the cursor is near for highlighting
+        Geometry::Point nearestSnap;
+        double minDist = m_snapDistance;
+        bool hasNearSnap = false;
+
+        if (m_waitingForSecondClick) {
+            for (const auto& snapPoint : snapPoints) {
+                double dist = m_drawCurrentPoint.distanceTo(snapPoint);
+                if (dist < minDist) {
+                    minDist = dist;
+                    nearestSnap = snapPoint;
+                    hasNearSnap = true;
+                }
+            }
+        }
+
+        for (const auto& snapPoint : snapPoints) {
+            QPointF screenPos = worldToScreen(snapPoint);
+
+            // Check if point is visible on screen
+            if (screenPos.x() < -50 || screenPos.x() > width() + 50 ||
+                screenPos.y() < -50 || screenPos.y() > height() + 50) {
+                continue;
+            }
+
+            // Check if this is the snap point we're near
+            bool isNearCursor = hasNearSnap &&
+                               std::abs(snapPoint.x - nearestSnap.x) < 0.001 &&
+                               std::abs(snapPoint.y - nearestSnap.y) < 0.001;
+
+            // Draw snap point indicator
+            // Origin gets special treatment - larger and different color
+            if (snapPoint.x == 0.0 && snapPoint.y == 0.0) {
+                if (isNearCursor) {
+                    painter.setPen(QPen(ACCENT_ORANGE, 3));
+                    painter.setBrush(QColor(ACCENT_ORANGE.red(), ACCENT_ORANGE.green(), ACCENT_ORANGE.blue(), 200));
+                    painter.drawEllipse(screenPos, 12, 12);
+                } else {
+                    painter.setPen(QPen(ACCENT_ORANGE, 2));
+                    painter.setBrush(QColor(ACCENT_ORANGE.red(), ACCENT_ORANGE.green(), ACCENT_ORANGE.blue(), 120));
+                    painter.drawEllipse(screenPos, 8, 8);
+                }
+            } else {
+                // Line endpoints and other snap points
+                if (isNearCursor) {
+                    painter.setPen(QPen(ACCENT_TEAL, 3));
+                    painter.setBrush(QColor(ACCENT_TEAL.red(), ACCENT_TEAL.green(), ACCENT_TEAL.blue(), 170));
+                    painter.drawEllipse(screenPos, 8, 8);
+                } else {
+                    QColor muted = QColor(ACCENT_TEAL.red(), ACCENT_TEAL.green(), ACCENT_TEAL.blue(), 110);
+                    painter.setPen(QPen(muted, 2));
+                    painter.setBrush(QColor(ACCENT_TEAL.red(), ACCENT_TEAL.green(), ACCENT_TEAL.blue(), 80));
+                    painter.drawEllipse(screenPos, 5, 5);
+                }
+            }
+        }
+    }
+
     // Draw measurement
     if (m_measuring) {
         drawMeasurement(painter);
+    }
+
+    // Draw cursor coordinates (modern HUD style - always visible in top-left)
+    // Use Menlo (macOS) or Monaco as fallback for monospace display
+    QFont coordFont("Menlo", 11, QFont::Bold);
+    coordFont.setStyleHint(QFont::Monospace);
+    painter.setFont(coordFont);
+
+    QString coordText = QString("📍 X: %1 m   Y: %2 m")
+        .arg(m_cursorWorldPos.x, 0, 'f', 3)
+        .arg(m_cursorWorldPos.y, 0, 'f', 3);
+
+    QRectF coordRect = painter.fontMetrics().boundingRect(coordText);
+    coordRect.adjust(-8, -4, 8, 4);
+    coordRect.moveTo(12, 12);
+
+    // Modern shadow effect
+    painter.fillRect(coordRect.adjusted(2, 2, 2, 2), QColor(0, 0, 0, 120));
+
+    painter.fillRect(coordRect, PANEL_BG);
+
+    // Border
+    painter.setPen(QPen(PANEL_BORDER, 1.5));
+    painter.drawRoundedRect(coordRect, 4, 4);
+
+    // Text
+    painter.setPen(TEXT_PRIMARY);
+    painter.drawText(coordRect, Qt::AlignCenter, coordText);
+
+    if (m_currentTool == Tool::DrawLine) {
+        QString snapText = QString("Snap %1 | %.2fm / %2°  (F to toggle)")
+            .arg(m_fixedSnapEnabled ? "ON" : "OFF")
+            .arg(m_fixedLengthStep, 0, 'f', 2)
+            .arg(m_fixedAngleStep, 0, 'f', 0);
+
+        QRectF snapRect = painter.fontMetrics().boundingRect(snapText);
+        snapRect.adjust(-8, -4, 8, 4);
+        snapRect.moveTopLeft(QPointF(12, coordRect.bottom() + 10));
+
+        painter.fillRect(snapRect.adjusted(2, 2, 2, 2), QColor(0, 0, 0, 120));
+        painter.fillRect(snapRect, PANEL_BG);
+        painter.setPen(PANEL_BORDER);
+        painter.drawRoundedRect(snapRect, 4, 4);
+        painter.setPen(TEXT_PRIMARY);
+        painter.drawText(snapRect, Qt::AlignCenter, snapText);
     }
 }
 
@@ -294,8 +428,6 @@ void MapCanvas::drawGrid(QPainter& painter) {
     double gridPixels = gridSize * m_scale;
 
     if (gridPixels < 10) return; // Don't draw if too small
-
-    painter.setPen(QPen(QColor(200, 200, 200), 1));
 
     // Calculate visible range
     Geometry::Point topLeft = screenToWorld(QPointF(0, 0));
@@ -326,19 +458,33 @@ void MapCanvas::drawGrid(QPainter& painter) {
         return;
     }
 
-    // Draw vertical lines
+    // Draw vertical lines with major/minor distinction
     for (int i = minGridX; i <= maxGridX; ++i) {
         double x = i * gridSize;
         QPointF p1 = worldToScreen(Geometry::Point(x, minGridY * gridSize));
         QPointF p2 = worldToScreen(Geometry::Point(x, maxGridY * gridSize));
+
+        // Major grid lines every 5 units (darker, thicker)
+        if (i % 5 == 0 && i != 0) {
+            painter.setPen(QPen(GRID_MAJOR_COLOR, 1.5));
+        } else {
+            painter.setPen(QPen(GRID_MINOR_COLOR, 1));
+        }
         painter.drawLine(p1, p2);
     }
 
-    // Draw horizontal lines
+    // Draw horizontal lines with major/minor distinction
     for (int i = minGridY; i <= maxGridY; ++i) {
         double y = i * gridSize;
         QPointF p1 = worldToScreen(Geometry::Point(minGridX * gridSize, y));
         QPointF p2 = worldToScreen(Geometry::Point(maxGridX * gridSize, y));
+
+        // Major grid lines every 5 units (darker, thicker)
+        if (i % 5 == 0 && i != 0) {
+            painter.setPen(QPen(GRID_MAJOR_COLOR, 1.5));
+        } else {
+            painter.setPen(QPen(GRID_MINOR_COLOR, 1));
+        }
         painter.drawLine(p1, p2);
     }
 }
@@ -347,34 +493,34 @@ void MapCanvas::drawOrigin(QPainter& painter) {
     QPointF origin = worldToScreen(Geometry::Point(0, 0));
 
     // Draw axis lines extending across visible area (global coordinate system)
-    painter.setPen(QPen(QColor(255, 0, 0, 100), 1, Qt::DashLine));
+    painter.setPen(QPen(QColor(ACCENT_ORANGE.red(), ACCENT_ORANGE.green(), ACCENT_ORANGE.blue(), 140), 1, Qt::DashLine));
     painter.drawLine(QPointF(0, origin.y()), QPointF(width(), origin.y()));  // X-axis
     painter.drawLine(QPointF(origin.x(), 0), QPointF(origin.x(), height()));  // Y-axis
 
     // Draw larger crosshair at origin
-    painter.setPen(QPen(Qt::red, 3));
+    painter.setPen(QPen(ACCENT_ORANGE, 3));
     painter.drawLine(origin + QPointF(-20, 0), origin + QPointF(20, 0));
     painter.drawLine(origin + QPointF(0, -20), origin + QPointF(0, 20));
 
     // Draw origin circle
-    painter.setBrush(QBrush(Qt::red));
+    painter.setBrush(QBrush(ACCENT_ORANGE));
     painter.drawEllipse(origin, 8, 8);
 
     // Draw axis labels
     painter.setFont(QFont("Arial", 11, QFont::Bold));
-    painter.setPen(Qt::red);
+    painter.setPen(TEXT_PRIMARY);
 
     // X-axis label (pointing right)
-    painter.fillRect(QRectF(origin.x() + 25, origin.y() - 12, 35, 24), QColor(255, 255, 255, 220));
+    painter.fillRect(QRectF(origin.x() + 25, origin.y() - 12, 35, 24), PANEL_BG);
     painter.drawText(QRectF(origin.x() + 25, origin.y() - 12, 35, 24), Qt::AlignCenter, "+X");
 
     // Y-axis label (pointing up)
-    painter.fillRect(QRectF(origin.x() - 12, origin.y() - 35, 24, 24), QColor(255, 255, 255, 220));
+    painter.fillRect(QRectF(origin.x() - 12, origin.y() - 35, 24, 24), PANEL_BG);
     painter.drawText(QRectF(origin.x() - 12, origin.y() - 35, 24, 24), Qt::AlignCenter, "+Y");
 
     // Origin label
     painter.setFont(QFont("Arial", 10, QFont::Bold));
-    painter.fillRect(QRectF(origin.x() + 12, origin.y() + 12, 60, 20), QColor(255, 255, 255, 230));
+    painter.fillRect(QRectF(origin.x() + 12, origin.y() + 12, 60, 20), PANEL_BG);
     painter.drawText(QRectF(origin.x() + 12, origin.y() + 12, 60, 20), Qt::AlignCenter, "Origin (0,0)");
 }
 
@@ -384,7 +530,7 @@ void MapCanvas::drawLines(QPainter& painter) {
 
         // Highlight selected line
         if (i == m_selectedLineIndex) {
-            painter.setPen(QPen(Qt::red, 5));  // Thicker red line for selection
+            painter.setPen(QPen(ACCENT_TEAL, 5));  // Thicker highlighted line for selection
         } else {
             painter.setPen(QPen(Qt::black, 3));
         }
@@ -404,23 +550,27 @@ void MapCanvas::drawDimension(QPainter& painter, const Geometry::Line& line) {
     QPointF end = worldToScreen(line.end);
     QPointF mid = (start + end) / 2.0;
 
-    // Calculate perpendicular offset for text
+    // Calculate perpendicular offset for text (SolidWorks style)
     QPointF vec = end - start;
     double len = std::sqrt(vec.x() * vec.x() + vec.y() * vec.y());
     if (len < 1e-6) return;
 
     QPointF perp(-vec.y() / len, vec.x() / len);
-    QPointF textPos = mid + perp * 15;
 
-    // Draw dimension text
+    // Position above the line (perpendicular offset)
+    // Make offset larger to avoid overlap with angle
+    QPointF textPos = mid + perp * 25;
+
+    // Draw dimension text with nice formatting
     QString dimText = QString::number(line.length(), 'f', 3) + " m";
-    painter.setPen(Qt::blue);
-    painter.setFont(QFont("Arial", 10));
+    painter.setPen(TEXT_PRIMARY);
+    painter.setFont(QFont("Arial", 11, QFont::Bold));
 
     QRectF textRect = painter.fontMetrics().boundingRect(dimText);
     textRect.moveCenter(textPos);
 
-    painter.fillRect(textRect.adjusted(-2, -2, 2, 2), QColor(255, 255, 255, 200));
+    painter.fillRect(textRect.adjusted(-3, -2, 3, 2), PANEL_BG);
+    painter.setPen(TEXT_PRIMARY);
     painter.drawText(textRect, Qt::AlignCenter, dimText);
 }
 
@@ -447,8 +597,8 @@ void MapCanvas::drawPaths(QPainter& painter) {
             // Highlight selected waypoint
             bool isSelected = (pathIdx == m_selectedPathIndex && i == m_selectedWaypointIndex);
             if (isSelected) {
-                painter.setPen(QPen(Qt::red, 3));
-                painter.setBrush(QBrush(Qt::red));
+                painter.setPen(QPen(ACCENT_ORANGE, 3));
+                painter.setBrush(QBrush(ACCENT_ORANGE));
                 painter.drawEllipse(p, 9, 9);  // Larger circle for selection
             } else {
                 painter.setPen(QPen(path.color, 2));
@@ -481,13 +631,14 @@ void MapCanvas::drawPaths(QPainter& painter) {
             while (headingDeg < -180) headingDeg += 360;
 
             QString headingText = QString("%1°").arg(headingDeg, 0, 'f', 0);
-            painter.setPen(path.color.darker(150));
+            painter.setPen(TEXT_PRIMARY);
             painter.setFont(QFont("Arial", 9, QFont::Bold));
 
             QRectF textRect = painter.fontMetrics().boundingRect(headingText);
             textRect.moveCenter(p + QPointF(0, 20));
 
-            painter.fillRect(textRect.adjusted(-2, -1, 2, 1), QColor(255, 255, 255, 220));
+            painter.fillRect(textRect.adjusted(-2, -1, 2, 1), PANEL_BG);
+            painter.setPen(TEXT_PRIMARY);
             painter.drawText(textRect, Qt::AlignCenter, headingText);
         }
     }
@@ -496,8 +647,8 @@ void MapCanvas::drawPaths(QPainter& painter) {
 void MapCanvas::drawRobot(QPainter& painter, const Geometry::RobotPose& pose) {
     QPointF center = worldToScreen(pose.position);
 
-    painter.setPen(QPen(Qt::darkGreen, 2));
-    painter.setBrush(QBrush(QColor(0, 200, 0, 100)));
+    painter.setPen(QPen(ACCENT_TEAL, 2));
+    painter.setBrush(QBrush(QColor(ACCENT_TEAL.red(), ACCENT_TEAL.green(), ACCENT_TEAL.blue(), 60)));
 
     switch (pose.shape) {
         case Geometry::RobotShape::Rectangle:
@@ -512,7 +663,7 @@ void MapCanvas::drawRobot(QPainter& painter, const Geometry::RobotPose& pose) {
     }
 
     // Draw heading indicator
-    painter.setPen(QPen(Qt::red, 3));
+    painter.setPen(QPen(ACCENT_ORANGE, 3));
     double indicatorLen = pose.length * m_scale * 0.6;
     QPointF headingEnd = center + QPointF(indicatorLen * std::cos(pose.heading),
                                           -indicatorLen * std::sin(pose.heading));
@@ -559,28 +710,28 @@ void MapCanvas::drawMeasurement(QPainter& painter) {
     QPointF end = worldToScreen(m_measureEnd);
 
     // Draw measurement line
-    painter.setPen(QPen(Qt::magenta, 2, Qt::DashLine));
+    painter.setPen(QPen(ACCENT_TEAL, 2, Qt::DashLine));
     painter.drawLine(start, end);
 
     // Draw snap indicators
     if (m_measureSnappedToRobot) {
         // Highlight snapped robot with green circle
-        painter.setPen(QPen(Qt::green, 3));
-        painter.setBrush(QBrush(QColor(0, 255, 0, 50)));
+        painter.setPen(QPen(ACCENT_TEAL.lighter(150), 3));
+        painter.setBrush(QBrush(QColor(ACCENT_TEAL.red(), ACCENT_TEAL.green(), ACCENT_TEAL.blue(), 70)));
         painter.drawEllipse(end, 15, 15);
 
         // Draw "ROBOT" label
-        painter.setPen(Qt::darkGreen);
+        painter.setPen(TEXT_PRIMARY);
         painter.setFont(QFont("Arial", 9, QFont::Bold));
         painter.drawText(end + QPointF(-15, -20), "ROBOT");
     } else if (m_measureSnappedToLine) {
         // Highlight snap point on line with yellow circle
-        painter.setPen(QPen(Qt::yellow, 3));
-        painter.setBrush(QBrush(QColor(255, 255, 0, 100)));
+        painter.setPen(QPen(ACCENT_ORANGE, 3));
+        painter.setBrush(QBrush(QColor(ACCENT_ORANGE.red(), ACCENT_ORANGE.green(), ACCENT_ORANGE.blue(), 90)));
         painter.drawEllipse(end, 12, 12);
 
         // Draw "LINE" label
-        painter.setPen(QColor(200, 150, 0));
+        painter.setPen(TEXT_PRIMARY);
         painter.setFont(QFont("Arial", 9, QFont::Bold));
         painter.drawText(end + QPointF(-12, -18), "LINE");
     }
@@ -597,14 +748,21 @@ void MapCanvas::drawMeasurement(QPainter& painter) {
     }
 
     QPointF mid = (start + end) / 2.0;
-    painter.setPen(Qt::magenta);
+    painter.setPen(TEXT_PRIMARY);
     painter.setFont(QFont("Arial", 11, QFont::Bold));
 
     QRectF textRect = painter.fontMetrics().boundingRect(distText);
     textRect.moveCenter(mid);
 
-    painter.fillRect(textRect.adjusted(-4, -4, 4, 4), QColor(255, 255, 255, 230));
+    painter.fillRect(textRect.adjusted(-4, -4, 4, 4), PANEL_BG);
+    painter.setPen(TEXT_PRIMARY);
     painter.drawText(textRect, Qt::AlignCenter, distText);
+
+    if (m_measureLocked) {
+        painter.setPen(TEXT_PRIMARY);
+        painter.setFont(QFont("Arial", 10, QFont::Bold));
+        painter.drawText(end + QPointF(15, 15), "[Locked]");
+    }
 }
 
 void MapCanvas::mousePressEvent(QMouseEvent* event) {
@@ -651,7 +809,7 @@ void MapCanvas::mousePressEvent(QMouseEvent* event) {
                     m_selectedLineIndex = lineIdx;
                     m_selectedPathIndex = -1;
                     m_selectedWaypointIndex = -1;
-                    emit statusMessage(QString("Line selected - Press Delete to remove"));
+                    emit statusMessage(QString("Line selected - Press Delete to remove or double-click to edit"));
                     update();
                     return;
                 }
@@ -702,6 +860,7 @@ void MapCanvas::mousePressEvent(QMouseEvent* event) {
     else if (event->button() == Qt::RightButton) {
         // Cancel current operation
         m_isDrawing = false;
+        m_waitingForSecondClick = false;
         m_measuring = false;
         m_isDraggingRobot = false;
         m_isDraggingWaypoint = false;
@@ -713,6 +872,10 @@ void MapCanvas::mousePressEvent(QMouseEvent* event) {
 void MapCanvas::mouseMoveEvent(QMouseEvent* event) {
     QPointF pos = event->position();
     Geometry::Point worldPos = screenToWorld(pos);
+
+    // Update cursor position for display
+    m_cursorWorldPos = worldPos;
+    update(); // Trigger repaint to show cursor coordinates
 
     // Handle robot dragging or rotating
     if (m_isDraggingRobot && m_draggedRobotIndex >= 0 && m_draggedRobotIndex < m_robots.size()) {
@@ -807,11 +970,8 @@ void MapCanvas::mouseMoveEvent(QMouseEvent* event) {
         handleMeasureMove(pos);
     }
 
-    // Update status with coordinates
-    QString coordText = QString("X: %1 m, Y: %2 m")
-        .arg(worldPos.x, 0, 'f', 3)
-        .arg(worldPos.y, 0, 'f', 3);
-    emit statusMessage(coordText);
+    m_cursorWorldPos = worldPos;
+    emit cursorPositionChanged(worldPos.x, worldPos.y);
 }
 
 void MapCanvas::mouseReleaseEvent(QMouseEvent* event) {
@@ -872,21 +1032,88 @@ void MapCanvas::resizeEvent(QResizeEvent* event) {
 }
 
 void MapCanvas::handleDrawLinePress(const QPointF& pos) {
-    m_isDrawing = true;
-    m_drawStartPoint = screenToWorld(pos);
+    Geometry::Point worldPos = screenToWorld(pos);
 
-    // Snap start point if enabled
+    // Snap if enabled
     if (m_snapToPoints) {
-        m_drawStartPoint = snapToNearestPoint(m_drawStartPoint);
+        worldPos = snapToNearestPoint(worldPos);
     }
 
-    m_drawCurrentPoint = m_drawStartPoint;
-    m_lastDrawPoint = m_drawStartPoint;
-    update();
+    if (!m_waitingForSecondClick) {
+        // FIRST CLICK: Set start point
+        m_drawStartPoint = worldPos;
+        m_drawCurrentPoint = worldPos;
+        m_lastDrawPoint = worldPos;
+        m_waitingForSecondClick = true;
+        m_isDrawing = true;
+
+        emit statusMessage(QString("Start point set at X: %1 m, Y: %2 m - Click to set end point, or ESC to cancel")
+            .arg(worldPos.x, 0, 'f', 3)
+            .arg(worldPos.y, 0, 'f', 3));
+
+        update();
+    } else {
+        // SECOND CLICK: Set end point and create line
+        // Use constrained endpoint if in constrained mode, otherwise use mouse position
+        if (!m_constrainedDrawing) {
+            m_drawCurrentPoint = worldPos;
+            if (m_fixedSnapEnabled) {
+                m_drawCurrentPoint = applyFixedLengthAngleSnap(m_drawStartPoint, m_drawCurrentPoint);
+            }
+        }
+        // If constrained, m_drawCurrentPoint is already set by applyConstrainedDimensions()
+
+        Geometry::Line line(m_drawStartPoint, m_drawCurrentPoint);
+
+        // Only add if line has some length
+        if (line.length() > 0.01) {
+            if (m_mapData) {
+                m_mapData->addLine(line);
+                emit lineAdded(line);
+
+                emit statusMessage(QString("Line added (length: %1 m) - Click to continue, D for dimensions, or ESC to finish")
+                    .arg(line.length(), 0, 'f', 3));
+            }
+
+            // Continue chain: start next line from current end point
+            m_drawStartPoint = m_drawCurrentPoint;
+            m_lastDrawPoint = m_drawCurrentPoint;
+
+            // Reset constrained drawing for next line
+            m_constrainedDrawing = false;
+
+            // Keep m_waitingForSecondClick = true to continue drawing
+        } else {
+            // Line too short, cancel
+            m_waitingForSecondClick = false;
+            m_isDrawing = false;
+            m_constrainedDrawing = false;
+            emit statusMessage(QString("Line too short - cancelled"));
+        }
+
+        update();
+    }
 }
 
 void MapCanvas::handleDrawLineMove(const QPointF& pos) {
+    // Only update preview when waiting for second click (SolidWorks-style)
+    if (!m_waitingForSecondClick) {
+        return;
+    }
+
+    // If in constrained drawing mode, line is locked to exact dimensions
+    if (m_constrainedDrawing) {
+        // Just update display - endpoint is already calculated
+        update();
+        return;
+    }
+
     Geometry::Point newPoint = screenToWorld(pos);
+
+    // Snap end point if enabled
+    if (m_snapToPoints) {
+        newPoint = snapToNearestPoint(newPoint);
+    }
 
     // STABILIZATION: Only update if moved beyond minimum distance threshold
     double minMoveDist = getMinimumMoveDistance();
@@ -898,36 +1125,35 @@ void MapCanvas::handleDrawLineMove(const QPointF& pos) {
     }
 
     m_drawCurrentPoint = newPoint;
+    if (m_fixedSnapEnabled) {
+        m_drawCurrentPoint = applyFixedLengthAngleSnap(m_drawStartPoint, m_drawCurrentPoint);
+    }
+    m_lastDrawPoint = m_drawCurrentPoint;
 
-    // Snap end point if enabled
-    if (m_snapToPoints) {
-        m_drawCurrentPoint = snapToNearestPoint(m_drawCurrentPoint);
+    // Show live distance and angle
+    double length = m_drawStartPoint.distanceTo(m_drawCurrentPoint);
+    double angle = std::atan2(m_drawCurrentPoint.y - m_drawStartPoint.y,
+                              m_drawCurrentPoint.x - m_drawStartPoint.x) * 180.0 / M_PI;
+
+    QString snapHint;
+    if (m_fixedSnapEnabled) {
+        snapHint = QString(" | Snap %.2fm / %3° (F toggles)")
+            .arg(m_fixedLengthStep, 0, 'f', 2)
+            .arg(m_fixedAngleStep, 0, 'f', 0);
     }
 
-    m_lastDrawPoint = m_drawCurrentPoint;
+    emit statusMessage(QString("Length: %1 m, Angle: %2° - Click to place, or press D for exact dimensions%3")
+        .arg(length, 0, 'f', 3)
+        .arg(angle, 0, 'f', 1)
+        .arg(snapHint));
+
     update();
 }
 
 void MapCanvas::handleDrawLineRelease(const QPointF& pos) {
-    m_drawCurrentPoint = screenToWorld(pos);
-
-    // Snap end point if enabled
-    if (m_snapToPoints) {
-        m_drawCurrentPoint = snapToNearestPoint(m_drawCurrentPoint);
-    }
-
-    Geometry::Line line(m_drawStartPoint, m_drawCurrentPoint);
-
-    // Only add if line has some length
-    if (line.length() > 0.01) {
-        if (m_mapData) {
-            m_mapData->addLine(line);
-            emit lineAdded(line);
-        }
-    }
-
-    m_isDrawing = false;
-    update();
+    // SolidWorks-style: We don't use mouse release - everything is click-based
+    // This function is kept for compatibility but does nothing
+    Q_UNUSED(pos);
 }
 
 void MapCanvas::handleDrawPathPress(const QPointF& pos) {
@@ -945,22 +1171,31 @@ void MapCanvas::handleDrawPathPress(const QPointF& pos) {
 }
 
 void MapCanvas::handleMeasurePress(const QPointF& pos) {
-    m_measuring = true;
-    m_measureStart = screenToWorld(pos);
+    if (!m_measuring || m_measureLocked) {
+        m_measuring = true;
+        m_measureLocked = false;
+        m_measureStart = screenToWorld(pos);
 
-    // Check if near a robot - snap to robot center
-    bool snappedStart = false;
-    m_measureStart = snapToNearestLineOrRobot(m_measureStart, snappedStart);
+        bool snappedStart = false;
+        m_measureStart = snapToNearestLineOrRobot(m_measureStart, snappedStart);
 
-    m_measureEnd = m_measureStart;
-    m_measureSnappedToLine = false;
-    m_measureSnappedToRobot = false;
-    m_measureSnappedLineIndex = -1;
-    m_measureSnappedRobotIndex = -1;
-    update();
+        m_measureEnd = m_measureStart;
+        m_measureSnappedToLine = false;
+        m_measureSnappedToRobot = false;
+        m_measureSnappedLineIndex = -1;
+        m_measureSnappedRobotIndex = -1;
+        emit statusMessage("Measurement started - click again to finish, or press Delete/Esc to clear");
+        update();
+    } else {
+        m_measureLocked = true;
+        emit statusMessage("Measurement locked. Press Delete or Esc to clear.");
+    }
 }
 
 void MapCanvas::handleMeasureMove(const QPointF& pos) {
+    if (m_measureLocked) {
+        return;
+    }
     m_measureEnd = screenToWorld(pos);
 
     // Check if near line or robot - snap to closest point on line or robot center
@@ -999,6 +1234,9 @@ Geometry::Point MapCanvas::snapToNearestPoint(const Geometry::Point& point) {
 QVector<Geometry::Point> MapCanvas::getAllSnappablePoints() const {
     QVector<Geometry::Point> points;
 
+    // ALWAYS add origin (0,0) as first snap point
+    points.append(Geometry::Point(0, 0));
+
     if (!m_mapData) {
         return points;
     }
@@ -1034,8 +1272,8 @@ void MapCanvas::drawReferencePoints(QPainter& painter) {
         QPointF pos = worldToScreen(refPoint.position);
 
         // Draw diamond shape
-        painter.setPen(QPen(Qt::magenta, 2));
-        painter.setBrush(QBrush(QColor(255, 0, 255, 100)));
+        painter.setPen(QPen(ACCENT_TEAL, 2));
+        painter.setBrush(QBrush(QColor(ACCENT_TEAL.red(), ACCENT_TEAL.green(), ACCENT_TEAL.blue(), 80)));
 
         QPainterPath diamond;
         double size = 8;
@@ -1047,11 +1285,11 @@ void MapCanvas::drawReferencePoints(QPainter& painter) {
         painter.drawPath(diamond);
 
         // Draw name
-        painter.setPen(Qt::magenta);
+        painter.setPen(TEXT_PRIMARY);
         painter.setFont(QFont("Arial", 10, QFont::Bold));
         QRectF textRect = painter.fontMetrics().boundingRect(refPoint.name);
         textRect.moveCenter(pos + QPointF(0, -15));
-        painter.fillRect(textRect.adjusted(-2, -2, 2, 2), QColor(255, 255, 255, 200));
+        painter.fillRect(textRect.adjusted(-2, -2, 2, 2), PANEL_BG);
         painter.drawText(textRect, Qt::AlignCenter, refPoint.name);
 
         // Draw heading arrow if it has one
@@ -1059,17 +1297,21 @@ void MapCanvas::drawReferencePoints(QPainter& painter) {
             double arrowLen = 20;
             QPointF arrowEnd = pos + QPointF(arrowLen * std::cos(refPoint.heading),
                                              -arrowLen * std::sin(refPoint.heading));
-            painter.setPen(QPen(Qt::magenta, 3));
+            painter.setPen(QPen(ACCENT_TEAL, 3));
             painter.drawLine(pos, arrowEnd);
         }
     }
 }
 
-// Draw angle label for a line
+// Draw angle label for a line (SolidWorks style: near start point)
 void MapCanvas::drawAngle(QPainter& painter, const Geometry::Line& line) {
     QPointF start = worldToScreen(line.start);
     QPointF end = worldToScreen(line.end);
-    QPointF mid = (start + end) / 2.0;
+
+    // Calculate line direction vector
+    QPointF vec = end - start;
+    double len = std::sqrt(vec.x() * vec.x() + vec.y() * vec.y());
+    if (len < 1e-6) return;
 
     double angleDeg = line.angleDegrees();
 
@@ -1079,13 +1321,30 @@ void MapCanvas::drawAngle(QPainter& painter, const Geometry::Line& line) {
 
     QString angleText = QString("%1°").arg(angleDeg, 0, 'f', 1);
 
-    painter.setPen(QColor(200, 100, 0));
-    painter.setFont(QFont("Arial", 9, QFont::Bold));
+    // Smart positioning based on line orientation to avoid overlap
+    QPointF perp(-vec.y() / len, vec.x() / len);
+    QPointF anglePos;
+
+    // Check if line is more horizontal or vertical
+    double absAngle = std::abs(angleDeg);
+    bool isNearHorizontal = (absAngle < 30 || absAngle > 150);
+
+    if (isNearHorizontal) {
+        // For horizontal lines: place angle BELOW the line (opposite side from distance)
+        anglePos = start + (vec / len) * 50 + perp * 25; // 50px along, 25px below
+    } else {
+        // For vertical/diagonal lines: place angle near start, offset perpendicular
+        anglePos = start + (vec / len) * 40 - perp * 20;
+    }
+
+    painter.setPen(TEXT_PRIMARY);
+    painter.setFont(QFont("Arial", 10, QFont::Bold));
 
     QRectF textRect = painter.fontMetrics().boundingRect(angleText);
-    textRect.moveCenter(mid + QPointF(0, 20));
+    textRect.moveCenter(anglePos);
 
-    painter.fillRect(textRect.adjusted(-2, -2, 2, 2), QColor(255, 255, 200, 220));
+    painter.fillRect(textRect.adjusted(-3, -2, 3, 2), PANEL_BG);
+    painter.setPen(TEXT_PRIMARY);
     painter.drawText(textRect, Qt::AlignCenter, angleText);
 }
 
@@ -1113,21 +1372,28 @@ void MapCanvas::handleAddReferencePress(const QPointF& pos) {
 
 // Handle double-click on waypoint to edit
 void MapCanvas::mouseDoubleClickEvent(QMouseEvent* event) {
-    if (!m_pathCollection) return;
-
     QPointF pos = event->position();
     Geometry::Point worldPos = screenToWorld(pos);
 
-    // Find if we clicked near a waypoint
-    for (int pathIdx = 0; pathIdx < m_pathCollection->paths.size(); ++pathIdx) {
-        const auto& path = m_pathCollection->paths[pathIdx];
-        for (int wpIdx = 0; wpIdx < path.waypoints.size(); ++wpIdx) {
-            const auto& wp = path.waypoints[wpIdx];
-            double dist = worldPos.distanceTo(wp.position);
-            if (dist < WAYPOINT_CLICK_THRESHOLD) {
-                emit waypointDoubleClicked(pathIdx, wpIdx);
-                return;
+    if (m_pathCollection) {
+        for (int pathIdx = 0; pathIdx < m_pathCollection->paths.size(); ++pathIdx) {
+            const auto& path = m_pathCollection->paths[pathIdx];
+            for (int wpIdx = 0; wpIdx < path.waypoints.size(); ++wpIdx) {
+                const auto& wp = path.waypoints[wpIdx];
+                double dist = worldPos.distanceTo(wp.position);
+                if (dist < WAYPOINT_CLICK_THRESHOLD) {
+                    emit waypointDoubleClicked(pathIdx, wpIdx);
+                    return;
+                }
             }
+        }
+    }
+
+    if (m_mapData) {
+        int lineIdx = findNearestLine(worldPos, LINE_PROXIMITY_THRESHOLD);
+        if (lineIdx >= 0) {
+            emit lineDoubleClicked(lineIdx);
+            return;
         }
     }
 }
@@ -1239,7 +1505,7 @@ Geometry::Point MapCanvas::getClosestPointOnLine(const Geometry::Line& line, con
 Geometry::Point MapCanvas::snapToNearestLineOrRobot(const Geometry::Point& point, bool& snapped) {
     snapped = false;
     Geometry::Point result = point;
-    double minDist = 0.5; // 50cm max snap distance
+    double minDist = 0.1; // 10cm max snap distance (less sensitive, SolidWorks style)
 
     // Reset snap flags
     m_measureSnappedToLine = false;
@@ -1346,16 +1612,35 @@ void MapCanvas::keyPressEvent(QKeyEvent* event) {
 
         emit statusMessage(QString("Nothing selected to delete"));
     }
+    else if (event->key() == Qt::Key_F) {
+        m_fixedSnapEnabled = !m_fixedSnapEnabled;
+        emit statusMessage(QString("Fixed snap %1 (%.2fm / %2°)")
+            .arg(m_fixedSnapEnabled ? "ON" : "OFF")
+            .arg(m_fixedLengthStep, 0, 'f', 2)
+            .arg(m_fixedAngleStep, 0, 'f', 0));
+        return;
+    }
     else if (event->key() == Qt::Key_Escape) {
         // Cancel operations and clear selection
         m_isDrawing = false;
+        m_waitingForSecondClick = false;
+        m_constrainedDrawing = false;
         m_measuring = false;
+        m_measureLocked = false;
         m_isDraggingRobot = false;
         m_isDraggingWaypoint = false;
         m_isEditingHeading = false;
         clearSelection();
         emit statusMessage(QString("Operation cancelled"));
         update();
+    }
+    else if (event->key() == Qt::Key_D && m_waitingForSecondClick) {
+        // Press 'D' while drawing to enter exact dimensions
+        promptForDimensions();
+    }
+    else if (event->key() == Qt::Key_E && m_selectedLineIndex >= 0) {
+        // Press 'E' to edit selected line properties
+        editLineProperties(m_selectedLineIndex);
     }
 
     QWidget::keyPressEvent(event);
@@ -1391,6 +1676,9 @@ void MapCanvas::contextMenuEvent(QContextMenuEvent* event) {
             m_selectedPathIndex = -1;
             m_selectedWaypointIndex = -1;
 
+            menu.addAction("Edit Line Properties", [this, lineIdx]() {
+                emit lineDoubleClicked(lineIdx);
+            });
             menu.addAction("Delete Line", this, &MapCanvas::deleteSelectedLine);
             menu.addSeparator();
             menu.exec(event->globalPos());
@@ -1402,4 +1690,142 @@ void MapCanvas::contextMenuEvent(QContextMenuEvent* event) {
     clearSelection();
     menu.addAction("Clear Selection", this, &MapCanvas::clearSelection);
     menu.exec(event->globalPos());
+}
+
+// CAD-style: Prompt for exact distance and angle
+void MapCanvas::promptForDimensions() {
+    if (!m_waitingForSecondClick) {
+        return;
+    }
+
+    QString input;
+    if (showStyledTextInput("Enter Dimensions",
+                            "Format: distance,angle\nExample: 2.0,90\n(distance in meters, angle in degrees)",
+                            QString("%1,%2").arg(m_constrainedDistance).arg(m_constrainedAngle),
+                            input) && !input.isEmpty()) {
+        QStringList parts = input.split(',');
+        if (parts.size() == 2) {
+            m_constrainedDistance = parts[0].toDouble();
+            m_constrainedAngle = parts[1].toDouble();
+            m_constrainedDrawing = true;
+
+            applyConstrainedDimensions();
+
+            emit statusMessage(QString("Constrained: %1 m @ %2° - Click to place or press D to adjust")
+                .arg(m_constrainedDistance, 0, 'f', 3)
+                .arg(m_constrainedAngle, 0, 'f', 1));
+
+            update();
+        } else {
+            emit statusMessage(QString("Invalid format! Use: distance,angle (e.g., 2.0,90)"));
+        }
+    }
+}
+
+// Apply constrained dimensions to current drawing
+void MapCanvas::applyConstrainedDimensions() {
+    if (!m_constrainedDrawing) {
+        return;
+    }
+
+    // Convert angle to radians (CAD: 0° = East, 90° = North)
+    double angleRad = m_constrainedAngle * M_PI / 180.0;
+
+    // Calculate endpoint from start point
+    double endX = m_drawStartPoint.x + m_constrainedDistance * std::cos(angleRad);
+    double endY = m_drawStartPoint.y + m_constrainedDistance * std::sin(angleRad);
+
+    m_drawCurrentPoint = Geometry::Point(endX, endY);
+    m_lastDrawPoint = m_drawCurrentPoint;
+}
+
+// Edit properties of an existing line
+void MapCanvas::editLineProperties(int lineIndex) {
+    if (!m_mapData || lineIndex < 0 || lineIndex >= m_mapData->lines.size()) {
+        return;
+    }
+
+    Geometry::Line& line = m_mapData->lines[lineIndex];
+    double currentLength = line.length();
+    double currentAngle = line.angleDegrees();
+
+    QString input;
+    if (showStyledTextInput("Edit Line Properties",
+                             QString("Current: %1 m @ %2°\n\nEnter new dimensions:\nFormat: distance,angle\nExample: 2.0,90")
+                                 .arg(currentLength, 0, 'f', 3)
+                                 .arg(currentAngle, 0, 'f', 1),
+                             QString("%1,%2").arg(currentLength, 0, 'f', 3).arg(currentAngle, 0, 'f', 1),
+                             input) && !input.isEmpty()) {
+        QStringList parts = input.split(',');
+        if (parts.size() == 2) {
+            double newDistance = parts[0].toDouble();
+            double newAngle = parts[1].toDouble();
+
+            // Keep start point, recalculate end point
+            double angleRad = newAngle * M_PI / 180.0;
+            line.end.x = line.start.x + newDistance * std::cos(angleRad);
+            line.end.y = line.start.y + newDistance * std::sin(angleRad);
+
+            emit statusMessage(QString("Line updated: %1 m @ %2°")
+                .arg(newDistance, 0, 'f', 3)
+                .arg(newAngle, 0, 'f', 1));
+
+            update();
+        } else {
+            emit statusMessage(QString("Invalid format! Use: distance,angle"));
+        }
+    }
+}
+
+bool MapCanvas::showStyledTextInput(const QString& title, const QString& prompt,
+                                    const QString& defaultValue, QString& outValue) const {
+    QInputDialog dialog;
+    dialog.setWindowTitle(title);
+    dialog.setLabelText(prompt);
+    dialog.setTextValue(defaultValue);
+    dialog.setInputMode(QInputDialog::TextInput);
+    dialog.resize(420, 0);
+
+    QPalette pal = dialog.palette();
+    pal.setColor(QPalette::Window, QColor(20, 25, 35));
+    pal.setColor(QPalette::Base, QColor(15, 20, 30));
+    pal.setColor(QPalette::Text, Qt::white);
+    pal.setColor(QPalette::WindowText, Qt::white);
+    pal.setColor(QPalette::ButtonText, Qt::white);
+    dialog.setPalette(pal);
+
+    dialog.setStyleSheet(
+        "QLabel { color: white; font-weight: 600; }"
+        "QLineEdit { color: white; background: #101622; border: 1px solid #3c4f6b; padding: 4px; }"
+        "QPushButton { color: white; background-color: #1f2b3d; padding: 4px 12px; border: 1px solid #3c4f6b; }"
+        "QPushButton:hover { background-color: #27354a; }"
+    );
+
+    if (dialog.exec() == QDialog::Accepted) {
+        outValue = dialog.textValue();
+        return true;
+    }
+    return false;
+}
+
+Geometry::Point MapCanvas::applyFixedLengthAngleSnap(const Geometry::Point& start,
+                                                     const Geometry::Point& candidate) const {
+    Geometry::Point snapped = candidate;
+    double dx = candidate.x - start.x;
+    double dy = candidate.y - start.y;
+    double length = std::sqrt(dx * dx + dy * dy);
+
+    if (length < 1e-6) {
+        return snapped;
+    }
+
+    double angleDeg = std::atan2(dy, dx) * 180.0 / M_PI;
+    double snappedAngleDeg = std::round(angleDeg / m_fixedAngleStep) * m_fixedAngleStep;
+    double snappedLength = std::max(m_fixedLengthStep,
+                                    std::round(length / m_fixedLengthStep) * m_fixedLengthStep);
+    double snappedAngleRad = snappedAngleDeg * M_PI / 180.0;
+
+    snapped.x = start.x + snappedLength * std::cos(snappedAngleRad);
+    snapped.y = start.y + snappedLength * std::sin(snappedAngleRad);
+    return snapped;
 }

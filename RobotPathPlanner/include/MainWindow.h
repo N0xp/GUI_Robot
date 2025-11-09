@@ -69,6 +69,7 @@ private slots:
     void saveAllPaths();
     void loadPaths();
     void editWaypoint(int pathIndex, int waypointIndex);
+    void editLine(int lineIndex);
 
     // Robot shape
     void onRobotShapeChanged(int index);
@@ -94,6 +95,8 @@ private:
     QString dialogDirectory(const QString& key) const;
     void setDialogDirectory(const QString& key, const QString& filePath) const;
     QString defaultDialogDirectory() const;
+    QColor getUniquePathColor(int pathIndex) const;
+    void reassignAllPathColors();
 
     // UI Components
     MapCanvas* m_canvas;

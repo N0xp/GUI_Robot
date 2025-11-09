@@ -140,15 +140,18 @@ Decision:
 ### Example 1: Autonomous Mode with Multiple Paths
 
 ```cpp
+#include "Robot.h"
+
 int MainTask() {
     pathplanner_init();
-    set_position(0, 0, 0);
 
     // Wait for GUI to send paths
-    while (pathPlanner.GetPathCount() < 3) {
+    while (pathPlanner.GetPathCount() < 1) {
         pathplanner_update_odometry(false);
         delay(100);
     }
+    set_position(0.3, 0.3, 0);
+    pathplanner_update_odometry(false);
 
     // List all available paths
     pathplanner_list_paths();
@@ -156,15 +159,11 @@ int MainTask() {
     // Execute specific paths in sequence
     pathplanner_execute_path("Pickup Cargo", true);
     delay(500);
-
-    pathplanner_execute_path("Deliver Cargo", true);
-    delay(500);
-
-    pathplanner_execute_path("Return Home", true);
-
-    return 0;
 }
 ```
+
+**Required Include:**
+- `#include "Robot.h"` - Provides all pathplanner functions, `set_position()`, `delay()`, and the `pathPlanner` instance
 
 ---
 

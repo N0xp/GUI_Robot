@@ -67,6 +67,8 @@ signals:
     void selectionChanged(int index);
     void distanceMeasured(double distance);
     void statusMessage(const QString& message);
+    void lineDoubleClicked(int lineIndex);
+    void cursorPositionChanged(double x, double y);
     void waypointDoubleClicked(int pathIndex, int waypointIndex);
 
 protected:
@@ -117,6 +119,15 @@ private:
     Geometry::Point getClosestPointOnLine(const Geometry::Line& line, const Geometry::Point& point) const;
     double getMinimumMoveDistance() const; // Minimum distance before updating drawing
 
+    // CAD-style dimension input
+    void promptForDimensions();
+    void applyConstrainedDimensions();
+    void editLineProperties(int lineIndex);
+    bool showStyledTextInput(const QString& title, const QString& prompt,
+                             const QString& defaultValue, QString& outValue) const;
+    Geometry::Point applyFixedLengthAngleSnap(const Geometry::Point& start,
+                                              const Geometry::Point& candidate) const;
+
     MapData* m_mapData;
     PathCollection* m_pathCollection;
     QVector<Geometry::RobotPose> m_robots;  // Support multiple robots
@@ -131,14 +142,20 @@ private:
     // Drawing state
     Tool m_currentTool;
     bool m_isDrawing;
+    bool m_waitingForSecondClick; // SolidWorks-style: true after first click, waiting for second
+    bool m_constrainedDrawing; // CAD-style: constrain to exact distance/angle
+    double m_constrainedDistance; // meters
+    double m_constrainedAngle; // degrees
     Geometry::Point m_drawStartPoint;
     Geometry::Point m_drawCurrentPoint;
     Geometry::Point m_lastDrawPoint; // For stabilization
+    Geometry::Point m_cursorWorldPos; // Current cursor position in world coordinates
 
     // Measurement
     Geometry::Point m_measureStart;
     Geometry::Point m_measureEnd;
     bool m_measuring;
+    bool m_measureLocked;
     bool m_measureSnappedToLine;  // Track if snapped to line
     bool m_measureSnappedToRobot; // Track if snapped to robot
     int m_measureSnappedLineIndex; // Which line we snapped to
@@ -184,6 +201,11 @@ private:
     // Mouse state
     QPointF m_lastMousePos;
     bool m_isPanning;
+
+    // Fixed snapping
+    bool m_fixedSnapEnabled;
+    double m_fixedLengthStep;
+    double m_fixedAngleStep;
 };
 
 #endif // MAPCANVAS_H

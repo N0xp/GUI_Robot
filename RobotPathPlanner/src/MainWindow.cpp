@@ -6,6 +6,7 @@
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QStatusBar>
+#include <cmath>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QFormLayout>
@@ -60,38 +61,50 @@ void MainWindow::createToolbars() {
     QActionGroup* toolGroup = new QActionGroup(this);
     toolGroup->setExclusive(true);
 
-    m_selectToolAction = new QAction("Select", this);
+    m_selectToolAction = new QAction("✓ Select", this);
     m_selectToolAction->setCheckable(true);
+    m_selectToolAction->setToolTip("Select and move objects (S)");
+    m_selectToolAction->setShortcut(QKeySequence(Qt::Key_S));
     toolGroup->addAction(m_selectToolAction);
     connect(m_selectToolAction, &QAction::triggered, this, &MainWindow::selectSelectTool);
     m_toolsToolbar->addAction(m_selectToolAction);
 
-    m_drawLineToolAction = new QAction("Draw Line", this);
+    m_drawLineToolAction = new QAction("📏 Draw Line", this);
     m_drawLineToolAction->setCheckable(true);
+    m_drawLineToolAction->setToolTip("Draw obstacles/walls - Click to start, move mouse, click to finish, press D for exact dimensions, ESC to end (L)");
+    m_drawLineToolAction->setShortcut(QKeySequence(Qt::Key_L));
     toolGroup->addAction(m_drawLineToolAction);
     connect(m_drawLineToolAction, &QAction::triggered, this, &MainWindow::selectDrawLineTool);
     m_toolsToolbar->addAction(m_drawLineToolAction);
 
-    m_drawPathToolAction = new QAction("Draw Path", this);
+    m_drawPathToolAction = new QAction("🛤️ Draw Path", this);
     m_drawPathToolAction->setCheckable(true);
+    m_drawPathToolAction->setToolTip("Add waypoints for robot path - Click to place waypoints (P)");
+    m_drawPathToolAction->setShortcut(QKeySequence(Qt::Key_P));
     toolGroup->addAction(m_drawPathToolAction);
     connect(m_drawPathToolAction, &QAction::triggered, this, &MainWindow::selectDrawPathTool);
     m_toolsToolbar->addAction(m_drawPathToolAction);
 
-    m_measureToolAction = new QAction("Measure", this);
+    m_measureToolAction = new QAction("📐 Measure", this);
     m_measureToolAction->setCheckable(true);
+    m_measureToolAction->setToolTip("Measure distances - Click start point, then end point (M)");
+    m_measureToolAction->setShortcut(QKeySequence(Qt::Key_M));
     toolGroup->addAction(m_measureToolAction);
     connect(m_measureToolAction, &QAction::triggered, this, &MainWindow::selectMeasureTool);
     m_toolsToolbar->addAction(m_measureToolAction);
 
-    m_panToolAction = new QAction("Pan", this);
+    m_panToolAction = new QAction("🖐️ Pan", this);
     m_panToolAction->setCheckable(true);
+    m_panToolAction->setToolTip("Pan the view - Click and drag to move canvas (H)");
+    m_panToolAction->setShortcut(QKeySequence(Qt::Key_H));
     toolGroup->addAction(m_panToolAction);
     connect(m_panToolAction, &QAction::triggered, this, &MainWindow::selectPanTool);
     m_toolsToolbar->addAction(m_panToolAction);
 
-    m_addReferenceToolAction = new QAction("Add Ref", this);
+    m_addReferenceToolAction = new QAction("📍 Add Ref", this);
     m_addReferenceToolAction->setCheckable(true);
+    m_addReferenceToolAction->setToolTip("Add reference points for calibration (R)");
+    m_addReferenceToolAction->setShortcut(QKeySequence(Qt::Key_R));
     toolGroup->addAction(m_addReferenceToolAction);
     connect(m_addReferenceToolAction, &QAction::triggered, this, &MainWindow::selectAddReferenceTool);
     m_toolsToolbar->addAction(m_addReferenceToolAction);
@@ -162,11 +175,18 @@ MainWindow::MainWindow(QWidget* parent)
     // Initialize with default map and one path
     m_mapData.name = "New Map";
     m_mapData.gridSize = 1.0;
-    m_pathCollection.addPath(PathData("Path 1"));
+
+    // Create first path with unique color
+    PathData firstPath("Path 1");
+    firstPath.color = getUniquePathColor(0);
+    m_pathCollection.addPath(firstPath);
 
     m_canvas->setMapData(&m_mapData);
     m_canvas->setPathCollection(&m_pathCollection);
     m_canvas->resetView();
+
+    // Ensure all paths have unique colors
+    reassignAllPathColors();
 
     updateRobotStatus();
     refreshWindowTitle();
@@ -202,6 +222,143 @@ void MainWindow::closeEvent(QCloseEvent* event) {
 }
 
 void MainWindow::setupUI() {
+    // Apply modern stylesheet
+    setStyleSheet(R"(
+        * {
+            color: #000000;
+        }
+        QMainWindow {
+            background-color: #f5f5f5;
+        }
+        QToolBar {
+            background-color: #ffffff;
+            border: none;
+            border-bottom: 1px solid #d0d0d0;
+            spacing: 8px;
+            padding: 4px;
+        }
+        QToolButton {
+            background-color: transparent;
+            border: 1px solid transparent;
+            border-radius: 4px;
+            padding: 6px 12px;
+            margin: 2px;
+            font-weight: 500;
+            color: #000000;
+        }
+        QToolButton:hover {
+            background-color: #e8f4fd;
+            border: 1px solid #b8ddf8;
+        }
+        QToolButton:pressed {
+            background-color: #d0e9f8;
+        }
+        QToolButton:checked {
+            background-color: #cce8ff;
+            border: 1px solid #0078d4;
+            color: #0078d4;
+        }
+        QDockWidget {
+            background-color: #ffffff;
+            titlebar-close-icon: url(close.png);
+            titlebar-normal-icon: url(float.png);
+            border: 1px solid #d0d0d0;
+        }
+        QDockWidget::title {
+            background-color: #f8f8f8;
+            padding: 8px;
+            border-bottom: 1px solid #d0d0d0;
+            font-weight: bold;
+            color: #000000;
+        }
+        QListWidget {
+            background-color: white;
+            border: 1px solid #d0d0d0;
+            border-radius: 4px;
+            padding: 4px;
+        }
+        QListWidget::item {
+            padding: 6px;
+            border-radius: 3px;
+            color: #000000;
+        }
+        QListWidget::item:selected {
+            background-color: #0078d4;
+            color: white;
+        }
+        QListWidget::item:hover {
+            background-color: #e8f4fd;
+        }
+        QPushButton {
+            background-color: #0078d4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 8px 16px;
+            font-weight: 500;
+        }
+        QPushButton:hover {
+            background-color: #106ebe;
+        }
+        QPushButton:pressed {
+            background-color: #005a9e;
+        }
+        QLabel {
+            color: #000000;
+            padding: 2px;
+        }
+        QGroupBox {
+            border: 1px solid #d0d0d0;
+            border-radius: 6px;
+            margin-top: 12px;
+            padding-top: 12px;
+            font-weight: bold;
+            background-color: white;
+        }
+        QGroupBox::title {
+            subcontrol-origin: margin;
+            subcontrol-position: top left;
+            padding: 4px 8px;
+            color: #0078d4;
+        }
+        QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox {
+            border: 1px solid #d0d0d0;
+            border-radius: 4px;
+            padding: 6px;
+            background-color: white;
+            color: #000000;
+        }
+        QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus {
+            border: 2px solid #0078d4;
+        }
+        QStatusBar {
+            background-color: #f8f8f8;
+            border-top: 1px solid #d0d0d0;
+        }
+        QMenuBar {
+            background-color: #ffffff;
+            border-bottom: 1px solid #d0d0d0;
+        }
+        QMenuBar::item {
+            padding: 6px 12px;
+            color: #000000;
+        }
+        QMenuBar::item:selected {
+            background-color: #e8f4fd;
+        }
+        QMenu {
+            background-color: white;
+            border: 1px solid #d0d0d0;
+        }
+        QMenu::item {
+            padding: 6px 24px;
+            color: #000000;
+        }
+        QMenu::item:selected {
+            background-color: #e8f4fd;
+        }
+    )");
+
     createMenus();
     createToolbars();
     setCentralWidget(m_canvas);
@@ -504,18 +661,33 @@ void MainWindow::createDockWidgets() {
 }
 
 void MainWindow::createStatusBar() {
-    m_statusLabel = new QLabel("Ready");
-    m_coordsLabel = new QLabel("X: 0.0 m, Y: 0.0 m");
-    m_robotStatusLabel = new QLabel("Robot: Disconnected");
+    m_statusLabel = new QLabel("✓ Ready");
+    m_statusLabel->setStyleSheet("padding: 4px 8px; color: #28a745;");
+
+    m_coordsLabel = new QLabel("📍 X: 0.0 m, Y: 0.0 m");
+    m_coordsLabel->setStyleSheet("padding: 4px 8px; font-weight: 600;");
+
+    m_robotStatusLabel = new QLabel("🔴 Robot: Disconnected");
+    m_robotStatusLabel->setStyleSheet("padding: 4px 8px; color: #dc3545;");
 
     statusBar()->addWidget(m_statusLabel, 1);
     statusBar()->addPermanentWidget(m_coordsLabel);
     statusBar()->addPermanentWidget(m_robotStatusLabel);
+
+    // Add helpful tip
+    QLabel* tipLabel = new QLabel(" 💡 Tip: Press L for Line, P for Path, M for Measure, S for Select ");
+    tipLabel->setStyleSheet("padding: 4px 8px; color: #6c757d; font-style: italic;");
+    statusBar()->addPermanentWidget(tipLabel);
 }
 
 void MainWindow::setupConnections() {
     // Canvas signals
     connect(m_canvas, &MapCanvas::statusMessage, this, &MainWindow::updateStatusMessage);
+    connect(m_canvas, &MapCanvas::cursorPositionChanged, this, [this](double x, double y) {
+        if (m_coordsLabel) {
+            m_coordsLabel->setText(QString("X: %1 m, Y: %2 m").arg(x, 0, 'f', 3).arg(y, 0, 'f', 3));
+        }
+    });
     connect(m_canvas, &MapCanvas::lineAdded, this, [this](const Geometry::Line&) {
         markMapModified();
         m_canvas->update();
@@ -860,9 +1032,14 @@ void MainWindow::createNewPath() {
                                         &ok);
     if (ok && !name.isEmpty()) {
         PathData newPath(name);
+
+        // Assign unique color based on path index
+        newPath.color = getUniquePathColor(m_pathCollection.paths.size());
+
         m_pathCollection.addPath(newPath);
         m_pathList->addItem(name);
         m_pathList->setCurrentRow(m_pathList->count() - 1);
+        m_canvas->update();
     }
 }
 
@@ -880,8 +1057,13 @@ void MainWindow::duplicatePath() {
     if (activePath) {
         PathData duplicate = *activePath;
         duplicate.name += " (Copy)";
+
+        // Assign unique color to duplicate
+        duplicate.color = getUniquePathColor(m_pathCollection.paths.size());
+
         m_pathCollection.addPath(duplicate);
         m_pathList->addItem(duplicate.name);
+        m_canvas->update();
     }
 }
 
@@ -927,6 +1109,11 @@ void MainWindow::loadPaths() {
     if (filename.isEmpty()) return;
 
     if (m_pathCollection.loadFromFile(filename)) {
+        // Assign unique colors to all loaded paths
+        for (int i = 0; i < m_pathCollection.paths.size(); ++i) {
+            m_pathCollection.paths[i].color = getUniquePathColor(i);
+        }
+
         // Update path list
         m_pathList->clear();
         for (const auto& path : m_pathCollection.paths) {
@@ -974,6 +1161,28 @@ void MainWindow::editWaypoint(int pathIndex, int waypointIndex) {
     }
 }
 
+void MainWindow::editLine(int lineIndex) {
+    if (lineIndex < 0 || lineIndex >= m_mapData.lines.size()) {
+        return;
+    }
+
+    Geometry::Line line = m_mapData.lines[lineIndex];
+    LineDialog dialog(line, this);
+
+    if (dialog.exec() == QDialog::Accepted) {
+        m_mapData.lines[lineIndex] = dialog.line();
+        m_canvas->update();
+        markMapModified();
+
+        const auto& updatedLine = m_mapData.lines[lineIndex];
+        statusBar()->showMessage(
+            QString("Line updated: length %1 m, angle %2°")
+                .arg(updatedLine.length(), 0, 'f', 3)
+                .arg(updatedLine.angleDegrees(), 0, 'f', 1),
+            3000);
+    }
+}
+
 void MainWindow::onRobotShapeChanged(int index) {
     Geometry::RobotPose pose = m_canvas->getCurrentPose();
 
@@ -1006,13 +1215,66 @@ void MainWindow::onGridSizeChanged(double size) {
 }
 
 void MainWindow::updateStatusMessage(const QString& message) {
-    m_coordsLabel->setText(message);
+    if (m_statusLabel) {
+        m_statusLabel->setText(message);
+    }
 }
 
 void MainWindow::updateRobotStatus() {
     if (m_robotComm->isConnected()) {
-        m_robotStatusLabel->setText("Robot: Connected");
+        m_robotStatusLabel->setText("🟢 Robot: Connected");
+        m_robotStatusLabel->setStyleSheet("padding: 4px 8px; color: #28a745; font-weight: bold;");
     } else {
-        m_robotStatusLabel->setText("Robot: Disconnected");
+        m_robotStatusLabel->setText("🔴 Robot: Disconnected");
+        m_robotStatusLabel->setStyleSheet("padding: 4px 8px; color: #dc3545;");
     }
+}
+
+// Generate unique, visually distinct colors for each path
+QColor MainWindow::getUniquePathColor(int pathIndex) const {
+    // Predefined set of distinct colors that work well together
+    // These are colorblind-friendly and visually distinct
+    static const QColor colors[] = {
+        QColor(228, 26, 28),    // Red
+        QColor(55, 126, 184),   // Blue
+        QColor(77, 175, 74),    // Green
+        QColor(152, 78, 163),   // Purple
+        QColor(255, 127, 0),    // Orange
+        QColor(255, 255, 51),   // Yellow
+        QColor(166, 86, 40),    // Brown
+        QColor(247, 129, 191),  // Pink
+        QColor(153, 153, 153),  // Gray
+        QColor(0, 128, 128),    // Teal
+        QColor(230, 25, 75),    // Crimson
+        QColor(60, 180, 75),    // Lime
+        QColor(0, 130, 200),    // Sky Blue
+        QColor(245, 130, 48),   // Amber
+        QColor(145, 30, 180),   // Violet
+        QColor(70, 240, 240),   // Cyan
+        QColor(240, 50, 230),   // Magenta
+        QColor(210, 245, 60),   // Lime Green
+        QColor(250, 190, 190),  // Light Pink
+        QColor(0, 0, 128)       // Navy
+    };
+
+    const int numColors = sizeof(colors) / sizeof(colors[0]);
+
+    // Use HSV color generation for paths beyond the predefined set
+    if (pathIndex < numColors) {
+        return colors[pathIndex];
+    } else {
+        // Generate additional colors using HSV space with golden ratio
+        // This ensures good color distribution
+        const double goldenRatio = 0.618033988749895;
+        double hue = fmod(pathIndex * goldenRatio, 1.0);
+        return QColor::fromHsvF(hue, 0.7, 0.9);
+    }
+}
+
+// Reassign unique colors to all existing paths
+void MainWindow::reassignAllPathColors() {
+    for (int i = 0; i < m_pathCollection.paths.size(); ++i) {
+        m_pathCollection.paths[i].color = getUniquePathColor(i);
+    }
+    m_canvas->update();
 }

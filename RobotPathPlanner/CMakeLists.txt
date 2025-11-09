@@ -28,6 +28,7 @@ set(SOURCES
     src/RobotComm.cpp
     src/Geometry.cpp
     src/WaypointDialog.cpp
+    src/LineDialog.cpp
 )
 
 set(HEADERS
@@ -38,6 +39,7 @@ set(HEADERS
     include/RobotComm.h
     include/Geometry.h
     include/WaypointDialog.h
+    include/LineDialog.h
 )
 
 # Create executable

@@ -381,6 +381,13 @@ namespace PathPlanner {
         else if (type == "getState") {
             // Don't spam console with state requests
             SendStatus("idle", false);
+
+            // Also send current robot pose
+            {
+                std::lock_guard<std::mutex> lock(m_poseMutex);
+                std::string poseJson = CreatePoseJson(m_currentPose);
+                SendMessage(poseJson);
+            }
         }
     }
 
